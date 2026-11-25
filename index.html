@@ -313,14 +313,15 @@ async function tabOldMedia(p) {
   el.innerHTML = `
     <div class="card stack">
       <h3 style="margin:0">Old media scan</h3>
-      <div class="meta">Searches the web for old interviews, transcripts, op-eds, profiles and student media; pulls archived tweets and old websites from the Wayback Machine; and checks YouTube and Trove. AI suggests quotes, but a quote is only kept if its exact words are on the page. Everything lands below for you to keep or dismiss.</div>
+      <div class="meta">Runs up to 13 searches at once: five general ones (radio and TV, print, life before office, their own words, coverage about them) plus searches locked to national papers, News Corp and metro papers, regional papers, radio and TV sites, Parliament's archives, the ABC, government sites and their own websites. Add topics to focus every search on what you're digging into. It also reads the archived pages of their old websites, pulls archived tweets, and checks YouTube and Trove. AI suggests quotes, but a quote is only kept if its exact words are on the page. Everything lands below for you to keep or dismiss.</div>
       ${researchLine(p) || `<div class="banner warn">Add their old Twitter handle, websites and other names under <b>Research details</b> first. It makes a big difference.</div>`}
       <form id="sf2" class="row">
+        <div style="flex:2"><label for="kw">Focus on topics <span class="hint">(optional, comma separated)</span></label><input id="kw" placeholder="e.g. nuclear, live exports, coal seam gas"></div>
         <div><label for="by">Published before</label><input id="by" type="number" min="1950" max="${yr + 1}" value="2013"></div>
         <div class="shrink" style="padding-bottom:.55rem"><label style="display:flex;gap:.4rem;align-items:center;font-weight:400"><input type="checkbox" id="anytime" style="width:auto"> Any date</label></div>
         <div class="shrink"><button class="btn red" type="submit">Run deep scan</button></div>
       </form>
-      <div class="hint">Takes 2–5 minutes. Daily limit per reporter applies.</div>
+      <div class="hint">Takes 5–12 minutes and costs roughly $1.50–2.50. Daily limit per reporter applies.</div>
       <div id="scanstat"></div>
     </div>
     <div class="row" style="margin:1rem 0 .5rem;align-items:center">
@@ -379,7 +380,7 @@ async function tabOldMedia(p) {
       if (!s) return;
       if (s.status === 'done') {
         const m = s.summary || {};
-        $('#scanstat').innerHTML = `<div class="banner ok">Done: ${m.total || 0} leads. ${m.web || 0} web pages (${m.web_verified_quotes || 0} quotes verified${m.web_dropped ? `, ${m.web_dropped} unverifiable quotes thrown out` : ''}), ${m.tweets || 0} archived tweets, ${m.archives || 0} old site snapshots, ${m.videos || 0} videos, ${m.trove || 0} Trove articles.${(m.errors || []).length ? `<br><span class="meta">Problems: ${esc(m.errors.join('; '))}</span>` : ''}</div>`;
+        $('#scanstat').innerHTML = `<div class="banner ok">Done${m.keywords ? ` (focus: ${esc(m.keywords)})` : ''}: ${m.total || 0} leads. ${m.web || 0} web pages (${m.web_verified_quotes || 0} quotes verified${m.web_dropped ? `, ${m.web_dropped} unverifiable quotes thrown out` : ''}), ${m.tweets || 0} archived tweets, ${m.archives || 0} old-website pages and snapshots${m.site_pages_found ? ` (from ${m.site_pages_found} archived pages found)` : ''}, ${m.videos || 0} videos, ${m.trove || 0} Trove articles.${(m.errors || []).length ? `<br><span class="meta">Problems: ${esc(m.errors.join('; '))}</span>` : ''}</div>`;
         $('#lst').value = 'new'; return drawLeads();
       }
       if (s.status === 'error') { $('#scanstat').innerHTML = `<div class="banner err">${esc(s.error || 'Scan failed')}</div>`; return; }
@@ -391,7 +392,8 @@ async function tabOldMedia(p) {
     e.preventDefault();
     const btn = $('#sf2 button'); btn.disabled = true;
     const before_year = $('#anytime').checked ? null : Number($('#by').value) || 2013;
-    const { data: s, error } = await sb.from('gf_scans').insert({ person_id: p.id, before_year }).select().single();
+    const keywords = $('#kw').value.trim().slice(0, 300) || null;
+    const { data: s, error } = await sb.from('gf_scans').insert({ person_id: p.id, before_year, keywords }).select().single();
     if (error) { btn.disabled = false; return toast(error.message, true); }
     const res = await api('scan-background', { method:'POST', body: JSON.stringify({ scan_id: s.id }) });
     btn.disabled = false;
