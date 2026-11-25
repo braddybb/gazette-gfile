@@ -59,6 +59,12 @@ export async function requireUser(req) {
   return user && user.id ? user : null;
 }
 
+// Emails exempt from the daily scan/check limits (Netlify env var UNLIMITED_EMAILS, comma separated)
+export function isUnlimited(user) {
+  const list = (process.env.UNLIMITED_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return !!user?.email && list.includes(String(user.email).toLowerCase());
+}
+
 // Lets the nightly cron call the sync jobs without a user session.
 export function isCron(req) {
   const secret = process.env.CRON_SECRET;
