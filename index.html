@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Calistoga&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
 <style>
 :root{
   --ink:#1C1809; --sand:#F6F3F0; --paper:#FFFFFF; --red:#D73D40; --red-soft:#F8DEDE;
@@ -96,10 +97,9 @@ dialog .card{border:0}
 <div id="app"></div>
 
 <script>
-/* ─────────── CONFIG: paste your Supabase project URL and anon (public) key ─────────── */
-const SUPABASE_URL = 'https://asgyshkafnrqknnmkbfo.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_fpHi1Cg3LIDcUkFK5O0IHg_nEoYFcx2';
-/* ───────────────────────────────────────────────────────────────────────────── */
+/* Keys live in config.js so this file can be replaced in updates without losing them. */
+const SUPABASE_URL = (window.GFILE_CONFIG || {}).SUPABASE_URL || 'https://YOUR-PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = (window.GFILE_CONFIG || {}).SUPABASE_ANON_KEY || 'YOUR-ANON-KEY';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = (s, el = document) => el.querySelector(s);
@@ -641,8 +641,9 @@ async function tabMoney(p) {
     p.last_name ? sb.from('gf_donations').select('*').is('person_id', null).ilike('recipient_name', `%${p.last_name}%`).order('amount', { ascending:false }).limit(100) : Promise.resolve({ data: [] }),
   ]);
   const fz = (fuzzy || []).filter(d => !p.first_name || d.recipient_name.toLowerCase().includes(p.first_name.split(' ')[0].toLowerCase()));
-  const tbl = (rows, linkable) => `<table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th>Type</th><th class="num">Amount</th>${linkable ? '<th></th>' : ''}</tr></thead><tbody>
-    ${rows.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${esc(d.period || fmtDate(d.received_on))}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="num">${money(d.amount)}</td>${linkable ? `<td><button class="linkish" data-link="${d.id}">This is them</button></td>` : ''}</tr>`).join('')}</tbody></table>`;
+  const total2 = (linked || []).filter(d => !/donor/.test(d.source || '')).reduce((a, d) => a + Number(d.amount || 0), 0);
+  const tbl = (rows, linkable) => `<table><thead><tr><th>Donor</th><th>Recipient</th><th>When</th><th>Reported in</th><th class="num">Amount</th>${linkable ? '<th></th>' : ''}</tr></thead><tbody>
+    ${rows.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${d.received_on ? fmtDate(d.received_on) : esc(d.period || '')}</td><td class="meta">${esc(DON_SRC[d.source] || d.source || '')}</td><td class="num">${money(d.amount)}</td>${linkable ? `<td><button class="linkish" data-link="${d.id}">This is them</button></td>` : ''}</tr>`).join('')}</tbody></table>`;
   const total = (linked || []).reduce((a, d) => a + Number(d.amount || 0), 0);
   el.innerHTML = `
     <div class="card stack"><h3>Linked to ${esc(p.full_name)} ${linked?.length ? `<span class="meta">· ${money(total)} across ${linked.length} records</span>` : ''}</h3>
@@ -769,6 +770,7 @@ function viewCapture(presetId) {
 }
 
 /* ─────────── Money ─────────── */
+const DON_SRC = { aec_annual_receipts:"Receiver's annual return", aec_annual_donor:"Donor's annual return", aec_annual_donor_received:"Donor's annual return (money in)", aec_annual_thirdparty:"Third party's annual return", aec_election_candidate:"Candidate's election return", aec_election_donor:"Donor's election return", aec_election_donor_received:"Donor's election return (money in)", aec_election_thirdparty:"Third party's election return", aec:'AEC export' };
 function parseCSV(text) {
   const rows = []; let row = [], f = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -803,6 +805,106 @@ function parseDate(s) {
 }
 async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 
+
+/* AEC bulk zip import */
+const AEC_PLANS = [
+  { file: /Detailed Receipts\.csv$/i, source: 'aec_annual_receipts', row: r => ({ recipient_name: r['Recipient Name'], donor_name: r['Received From'], amount: r['Value'], period: r['Financial Year'], return_type: r['Return Type'], receipt_type: r['Receipt Type'] }) },
+  { file: /(^|\/)Donations Made\.csv$/i, source: 'aec_annual_donor', row: r => ({ recipient_name: r['Donation Made To'], donor_name: r['Donor Name'], amount: r['Value'], period: r['Financial Year'], received_on: r['Date'], receipt_type: 'Donation' }) },
+  { file: /Donor Donations Received\.csv$/i, source: 'aec_annual_donor_received', annual: true, row: r => ({ recipient_name: r['Name'], donor_name: r['Donation Received From'], amount: r['Value'], period: r['Financial Year'], received_on: r['Date'], receipt_type: 'Donation received by donor' }) },
+  { file: /Third Party Donations Received\.csv$/i, source: 'aec_annual_thirdparty', row: r => ({ recipient_name: r['Name'], donor_name: r['Donation Received From'], amount: r['Value'], period: r['Financial Year'], received_on: r['Date'], receipt_type: 'Donation' }) },
+  { file: /Senate Groups and Candidate Donations\.csv$/i, source: 'aec_election_candidate', row: r => ({ recipient_name: r['Name'], donor_name: r['Donor Name'], amount: r['Gift Value'], period: r['Event'], received_on: r['Date Of Gift'], return_type: r['Return Type (Candidate/Senate Group)'], receipt_type: 'Election gift' }) },
+  { file: /Donor Donations Made\.csv$/i, source: 'aec_election_donor', row: r => ({ recipient_name: r['Donated To'], donor_name: r['Donor Name'], amount: r['Donated To Gift Value'], period: r['Event'], received_on: r['Donated To Date Of Gift'], receipt_type: 'Election gift' }) },
+  { file: /Third Party Return Donations Made\.csv$/i, source: 'aec_election_thirdparty', row: r => ({ recipient_name: r['Name'], donor_name: r['Third Party Name'], amount: r['Donation Value'], period: r['Event'], received_on: r['Date Of Donation'], receipt_type: 'Election gift' }) },
+];
+// the elections zip also has "Donor Donations Received.csv" with different columns
+const AEC_ELECTION_DONOR_RECEIVED = { source: 'aec_election_donor_received', row: r => ({ recipient_name: r['Donor Name'], donor_name: r['Gift From Name'], amount: r['Gift From Gift Value'], period: r['Event'], received_on: r['Gift From Date Of Gift'], receipt_type: 'Gift received by donor' }) };
+
+// Fast stable hash for de-duplicating rows (two seeded 53-bit hashes → 106 bits)
+function cyrb53(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+}
+const fastHash = (s) => 'a' + cyrb53(s, 1) + cyrb53(s, 2);
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); }); }
+const nameKey = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z' -]/g, ' ').replace(/\s+/g, ' ').trim();
+function aecPersonName(n) {
+  let s = String(n || '').trim().replace(/\s+/g, ' ');
+  s = s.replace(/\b(The Hon\.?|Hon\.?|Senator|Dr\.?|Mr\.?|Mrs\.?|Ms\.?|Miss|Prof\.?)\s+/gi, '').replace(/\s+(MP|AM|AO|AC|OAM|PSM|CSC)\b\.?/g, '').trim();
+  const m = s.match(/^([A-Z][A-Z'’ -]+),\s*(.+)$/); // "SMITH, Jane Mary"
+  if (m) return { first: m[2].split(' ')[0], last: m[1] };
+  const parts = s.split(' ');
+  return parts.length >= 2 ? { first: parts[0], last: parts[parts.length - 1] } : null;
+}
+
+async function importAecZip(file) {
+  if (!file) return;
+  const out = $('#mzprev');
+  out.innerHTML = '<div class="banner warn"><span class="spinner"></span> Opening the zip…</div>';
+  try {
+    if (!window.JSZip) await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+    const zip = await JSZip.loadAsync(file);
+    const names = Object.keys(zip.files).filter(n => /\.csv$/i.test(n) && !zip.files[n].dir);
+    const isElections = names.some(n => /Senate Groups and Candidate|Media Returns/i.test(n));
+    // people lookup: "first last" → id, ambiguous names dropped
+    const people = new Map();
+    for (const p of PEOPLE) {
+      const first = (p.first_name || p.full_name.split(' ')[0] || '').split(' ')[0];
+      const last = p.last_name || p.full_name.split(' ').pop();
+      const k = nameKey(`${first} ${last}`);
+      people.set(k, people.has(k) ? null : p.id);
+    }
+    const jobs = [];
+    for (const n of names) {
+      const base = n.split('/').pop();
+      let plan = AEC_PLANS.find(pl => pl.file.test(base) && !(pl.annual && isElections));
+      if (/Donor Donations Received\.csv$/i.test(base) && isElections) plan = AEC_ELECTION_DONOR_RECEIVED;
+      if (plan) jobs.push({ n: base, path: n, plan });
+    }
+    if (!jobs.length) { out.innerHTML = `<div class="banner err">No donation files found in that zip. Files inside: ${esc(names.join(', '))}</div>`; return; }
+    let totalNew = 0, totalSkipped = 0, totalLinked = 0; const report = [];
+    for (const j of jobs) {
+      out.innerHTML = `<div class="banner warn"><span class="spinner"></span> Reading ${esc(j.n)}…</div>`;
+      const rows = parseCSV(await zip.files[j.path].async('string'));
+      const head = rows[0].map(h => h.trim().replace(/^﻿/, ''));
+      const seen = new Map();
+      const recs = [];
+      for (const r of rows.slice(1)) {
+        const o = {}; head.forEach((h, i) => o[h] = (r[i] || '').trim());
+        const x = j.plan.row(o);
+        if (!x.recipient_name || !x.donor_name) continue;
+        const amount = Number(String(x.amount || '').replace(/[$,\s]/g, ''));
+        const rec = {
+          recipient_name: x.recipient_name, donor_name: x.donor_name, amount: isFinite(amount) ? amount : null,
+          period: x.period || null, return_type: x.return_type || null, receipt_type: x.receipt_type || null,
+          received_on: parseDate(x.received_on || ''), source: j.plan.source, imported_by: me.id, person_id: null,
+        };
+        const nm = aecPersonName(rec.recipient_name);
+        if (nm) { const id = people.get(nameKey(`${nm.first} ${nm.last}`)); if (id) { rec.person_id = id; totalLinked++; } }
+        const base = [rec.source, rec.recipient_name, rec.donor_name, rec.amount, rec.period, rec.return_type, rec.receipt_type, rec.received_on].join('|').toLowerCase();
+        const k = (seen.get(base) || 0) + 1; seen.set(base, k);
+        rec.row_hash = base + '#' + k; // hashed below
+        recs.push(rec);
+      }
+      let added = 0;
+      for (let i = 0; i < recs.length; i += 1000) {
+        const chunk = recs.slice(i, i + 1000);
+        for (const c of chunk) c.row_hash = fastHash(c.row_hash);
+        const { data, error } = await sb.from('gf_donations').upsert(chunk, { onConflict: 'row_hash', ignoreDuplicates: true }).select('id');
+        if (error) throw new Error(`${j.n}: ${error.message}`);
+        added += data.length; totalSkipped += chunk.length - data.length;
+        out.innerHTML = `<div class="banner warn"><span class="spinner"></span> ${esc(j.n)}: ${(i + chunk.length).toLocaleString()} / ${recs.length.toLocaleString()} rows</div>`;
+      }
+      totalNew += added; report.push(`${j.n}: ${added.toLocaleString()} new`);
+    }
+    out.innerHTML = `<div class="banner ok"><b>Done.</b> ${totalNew.toLocaleString()} new records${totalSkipped ? `, ${totalSkipped.toLocaleString()} already on file` : ''}. ${totalLinked.toLocaleString()} rows matched to people on file.<div class="meta" style="margin-top:.3rem">${report.map(esc).join(' · ')}</div></div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="banner err">${esc(e.message)}. Anything imported before the problem is kept; re-importing skips it.</div>`;
+  }
+}
+
 function viewMoney() {
   $('#view').innerHTML = `
   <h1>Money</h1>
@@ -812,7 +914,13 @@ function viewMoney() {
     <div id="mres"></div>
   </div>
   <div class="card stack" style="margin-top:1rem">
-    <h3>Import from the AEC Transparency Register</h3>
+    <h3>Import the AEC bulk download (zip)</h3>
+    <div class="hint">On transparency.aec.gov.au, use <b>Download all data</b> for Annual returns and for Election returns, then drop each zip here as it is. GFILE reads every donation file inside (about 200,000 rows), matches candidates and MPs to people on file, and skips rows it already has. Re-import new downloads whenever the AEC publishes more. It takes a few minutes, so keep the tab open.</div>
+    <input type="file" id="mzip" accept=".zip,application/zip">
+    <div id="mzprev"></div>
+  </div>
+  <div class="card stack" style="margin-top:1rem">
+    <h3>Import a single CSV</h3>
     <div class="hint">On transparency.aec.gov.au, filter the data you want (e.g. Donations made, or Detailed receipts for a party or candidate), use Export to CSV, then drop the file here. State electoral commission exports work too if the columns are similar. Duplicate rows are skipped automatically.</div>
     <input type="file" id="mfile" accept=".csv,text/csv">
     <div id="mprev"></div>
@@ -824,9 +932,10 @@ function viewMoney() {
     const { data, error } = await sb.from('gf_donations').select('*').or(`donor_name.ilike.%${q}%,recipient_name.ilike.%${q}%`).order('amount', { ascending:false }).limit(200);
     if (error) return ($('#mres').innerHTML = `<div class="banner err">${esc(error.message)}</div>`);
     const total = data.reduce((a, d) => a + Number(d.amount || 0), 0);
-    $('#mres').innerHTML = data.length ? `<div class="meta">${data.length}${data.length === 200 ? '+' : ''} records · ${money(total)}</div><table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th>Type</th><th class="num">Amount</th></tr></thead><tbody>
-      ${data.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${d.person_id ? `<a href="#person/${d.person_id}">${esc(d.recipient_name)}</a>` : esc(d.recipient_name)}</td><td>${esc(d.period || fmtDate(d.received_on))}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No matches.</div>';
+    $('#mres').innerHTML = data.length ? `<div class="meta">${data.length}${data.length === 200 ? '+' : ''} records · ${money(total)}</div><table><thead><tr><th>Donor</th><th>Recipient</th><th>When</th><th>Type</th><th>Reported in</th><th class="num">Amount</th></tr></thead><tbody>
+      ${data.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${d.person_id ? `<a href="#person/${d.person_id}">${esc(d.recipient_name)}</a>` : esc(d.recipient_name)}</td><td>${d.received_on ? fmtDate(d.received_on) : esc(d.period || '')}${d.received_on && d.period ? `<div class="meta">${esc(d.period)}</div>` : ''}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="meta">${esc(DON_SRC[d.source] || d.source || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table><div class="hint">The same gift can appear twice: once in the giver's return and once in the receiver's. Check "Reported in" before adding up totals.</div>` : '<div class="meta">No matches.</div>';
   };
+  $('#mzip').onchange = (e) => importAecZip(e.target.files[0]);
   $('#mfile').onchange = async (e) => {
     const file = e.target.files[0]; if (!file) return;
     const rows = parseCSV(await file.text());
@@ -1083,7 +1192,7 @@ async function importPeople(e) {
 
 /* ─────────── Boot ─────────── */
 async function boot() {
-  if (SUPABASE_URL.includes('YOUR-PROJECT')) { $('#app').innerHTML = '<div class="login card"><h2>Setup needed</h2><p>Add your Supabase URL and anon key at the top of index.html.</p></div>'; return; }
+  if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.includes('YOUR-ANON') || SUPABASE_ANON_KEY.includes('PASTE-YOUR')) { $('#app').innerHTML = '<div class="login card"><h2>Setup needed</h2><p>Add your Supabase anon key to config.js.</p></div>'; return; }
   const { data } = await sb.auth.getSession();
   session = data.session; me = session?.user || null;
   if (!session) return viewLogin();
