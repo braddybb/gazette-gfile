@@ -88,3 +88,70 @@ export function yearOf(d) {
   const m = String(d || '').match(/(19|20)\d\d/);
   return m ? Number(m[0]) : null;
 }
+
+// ───────── Source quality ─────────
+// Encyclopedias, profile aggregators and pages that can't be read without a login.
+// They describe people in the third person, so they are not a source of the person's own words.
+export const SKIP_HOSTS = /(^|\.)(wikipedia\.org|wikiwand\.com|grokipedia\.com|wikidata\.org|dbpedia\.org|everybodywiki\.com|peoplepill\.com|alchetron\.com|famousbirthdays\.com|prabook\.com|notable-people\.com|notablepeople\.\w+|celebsagewiki\.com|biographon\.com|wikitia\.com|ballotpedia\.org|linkedin\.com|facebook\.com|instagram\.com|x\.com|twitter\.com|tiktok\.com|pinterest\.\w+|quora\.com|reddit\.com)$/i;
+export const BLOCKED_FOR_SEARCH = ['wikipedia.org', 'wikiwand.com', 'grokipedia.com', 'everybodywiki.com', 'peoplepill.com', 'alchetron.com', 'famousbirthdays.com', 'prabook.com', 'linkedin.com', 'pinterest.com', 'quora.com'];
+export function skipHost(url) {
+  try { return SKIP_HOSTS.test(new URL(url).hostname.replace(/^www\./, '')); } catch { return false; }
+}
+
+const norm2 = (s) => String(s || '').toLowerCase()
+  .replace(/[“”„"]/g, '"').replace(/[‘’`']/g, "'").replace(/[–—]/g, '-')
+  .replace(/&nbsp;| /g, ' ').replace(/\s+/g, ' ').trim();
+
+// Does the page actually mention this person by name (not just their surname)?
+export function mentionsPerson(text, person) {
+  const t = norm2(text);
+  const names = [person.full_name, ...(person.aliases || [])].filter(Boolean).map(norm2);
+  const first = norm2((person.first_name || person.full_name || '').split(' ')[0]);
+  const last = norm2(person.last_name || (person.full_name || '').split(' ').pop());
+  if (names.some(n => n && t.includes(n))) return true;
+  // "Ms Wilson", "Cr Wilson", "Senator Wilson", or first and last name close together
+  if (new RegExp(`\\b(mr|mrs|ms|miss|dr|cr|councillor|senator|minister|premier|treasurer|mayor)\\.? ${last}\\b`).test(t)) return true;
+  const i = t.indexOf(first), j = t.indexOf(last);
+  return i !== -1 && j !== -1 && Math.abs(i - j) < 40;
+}
+
+// Is this quote plausibly the person's own words, not text written about them?
+// 1. People don't refer to themselves by surname. 2. Their name (or a speaker label) should be
+// near the quote on the page — "Wilson said", "MS WILSON:", "said Ms Wilson" — unless it's their own site.
+export function attributedQuote(quote, pageText, person, { ownSite = false } = {}) {
+  const q = norm2(quote).replace(/^["'\s]+|["'\s]+$/g, '');
+  const last = norm2(person.last_name || (person.full_name || '').split(' ').pop());
+  const first = norm2((person.first_name || person.full_name || '').split(' ')[0]);
+  if (last && new RegExp(`\\b${last.replace(/[^a-z' -]/g, '')}\\b`).test(q)) return false;
+  if (/^(he|she|they) (has|had|was|is|said|says|told|vowed|announced|pledged|supported|opposed)\b/.test(q)) return false;
+  if (ownSite) return true;
+  const page = norm2(pageText);
+  const piece = q.split(/\s*(?:\.\.\.|…)\s*/)[0].slice(0, 60);
+  const at = page.indexOf(piece);
+  if (at === -1) return false;
+  const around = page.slice(Math.max(0, at - 350), Math.min(page.length, at + q.length + 350));
+  const nameNear = (last && around.includes(last)) || (first && first.length > 2 && around.includes(first));
+  const speechCue = /\b(said|says|told|added|argued|claimed|declared|insisted|explained|wrote|writes|according to)\b|:\s*$/.test(around) || /[a-z]+:\s/.test(around.slice(0, 350));
+  return nameNear && speechCue;
+}
+
+// Best guess at when a page was published, from its own metadata or URL
+export function publishedFromHtml(html, url = '') {
+  const h = String(html || '');
+  const pick = (re) => { const m = h.match(re); return m ? m[1] : null; };
+  const raw = pick(/<meta[^>]+(?:property|name|itemprop)=["'](?:article:published_time|og:published_time|datePublished|pubdate|publishdate|date|dc\.date|DC\.date\.issued|sailthru\.date)["'][^>]*content=["']([^"']+)["']/i)
+    || pick(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name|itemprop)=["'](?:article:published_time|datePublished|pubdate|date)["']/i)
+    || pick(/"datePublished"\s*:\s*"([^"]+)"/i)
+    || pick(/<time[^>]+datetime=["']([^"']+)["']/i);
+  const iso = raw && String(raw).match(/((?:19|20)\d\d)-(\d\d)-(\d\d)/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const u = String(url).match(/\/((?:19|20)\d\d)\/(\d\d)\/(\d\d)\//);
+  if (u) return `${u[1]}-${u[2]}-${u[3]}`;
+  return null;
+}
+
+// Pull the list of refused domains out of the search tool's error message
+export function refusedDomains(message) {
+  const m = String(message || '').match(/not accessible to our user agent:\s*\[([^\]]*)\]/i);
+  return m ? [...m[1].matchAll(/'([^']+)'|"([^"]+)"/g)].map(x => (x[1] || x[2]).toLowerCase()) : [];
+}

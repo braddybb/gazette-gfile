@@ -41,6 +41,7 @@ export function pickCurrent(rows, pos, now = new Date()) {
       person: qidOf(b.person?.value), name: b.personLabel?.value,
       district: b.districtLabel?.value || null, party: b.partyLabel?.value || null,
       when: b.start?.value || b.termStart?.value || null, image: b.image?.value || null,
+      firstStart: b.firstStart?.value || null,
     };
     if (!rec.party && b.party2Label?.value) rec.party = b.party2Label.value;
     if (!rec.when && (b.start?.value || b.termStart?.value)) rec.when = b.start?.value || b.termStart?.value;
