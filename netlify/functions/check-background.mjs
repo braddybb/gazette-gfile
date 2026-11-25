@@ -1,7 +1,7 @@
 // Contradiction check: compares everything on file for one person on one topic and
 // flags reversals, shifts and say/vote gaps. The model only returns statement IDs —
 // every quote shown to reporters comes straight from the database, never from the model.
-import { db, requireUser, env } from '../lib/gfile.mjs';
+import { db, requireUser, env, isUnlimited } from '../lib/gfile.mjs';
 
 const CAP = Number(process.env.CHECK_DAILY_CAP || 15);
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
@@ -95,7 +95,7 @@ export default async (req) => {
     // Daily cap per reporter
     const dayStart = new Date(); dayStart.setUTCHours(dayStart.getUTCHours() - 24);
     const recent = await db(`gf_checks?select=id&requested_by=eq.${user.id}&status=in.(running,done)&created_at=gte.${dayStart.toISOString()}`);
-    if (recent.length >= CAP) return await fail(checkId, `Daily limit of ${CAP} checks reached. Try again tomorrow.`), new Response('capped');
+    if (!isUnlimited(user) && recent.length >= CAP) return await fail(checkId, `Daily limit of ${CAP} checks reached. Try again tomorrow.`), new Response('capped');
 
     await db(`gf_checks?id=eq.${checkId}`, { method: 'PATCH', body: { status: 'running' } });
 

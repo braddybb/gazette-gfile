@@ -4,7 +4,7 @@
 // 3. Archived tweets and old websites from the Wayback Machine
 // 4. Pre-cutoff YouTube videos and Trove newspaper articles (if keys are set)
 // Everything lands in a review queue (gf_leads). Nothing goes on the record until a reporter keeps it.
-import { db, upsert, requireUser, env, log } from '../lib/gfile.mjs';
+import { db, upsert, requireUser, env, log, isUnlimited } from '../lib/gfile.mjs';
 import { htmlToText, pdfToText } from '../lib/parse.mjs';
 import { verifyQuote, tweetFromHtml, waybackRaw, waybackView, tsToDate, parseCdx, spread, windowsAround, yearOf, skipHost, BLOCKED_FOR_SEARCH, mentionsPerson, attributedQuote, publishedFromHtml, refusedDomains } from '../lib/scan.mjs';
 
@@ -383,7 +383,7 @@ export default async (req) => {
   try {
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const recent = await db(`gf_scans?select=id&requested_by=eq.${user.id}&status=in.(running,done)&created_at=gte.${since}`);
-    if (recent.length >= CAP) return await fail(scanId, `Daily limit of ${CAP} deep scans reached. Try again tomorrow.`), new Response('capped');
+    if (!isUnlimited(user) && recent.length >= CAP) return await fail(scanId, `Daily limit of ${CAP} deep scans reached. Try again tomorrow.`), new Response('capped');
     await db(`gf_scans?id=eq.${scanId}`, { method: 'PATCH', body: { status: 'running' } });
 
     const [person] = await db(`gf_people?id=eq.${scan.person_id}&select=*`);
