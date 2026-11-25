@@ -1,0 +1,9 @@
+{
+  "name": "gazette-gfile",
+  "private": true,
+  "type": "module",
+  "description": "GFILE \u2014 politician statements, votes and money tracker",
+  "dependencies": {
+    "unpdf": "^1.0.0"
+  }
+}

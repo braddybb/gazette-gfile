@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>GFILE · Gazette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Calistoga&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --ink:#1C1809; --sand:#F6F3F0; --paper:#FFFFFF; --red:#D73D40; --red-soft:#F8DEDE;
+  --muted:#6E685C; --line:#E2DCD3; --ok:#2F7D4F; --ok-soft:#DDEFE3; --warn:#9A6B00; --warn-soft:#FBF0D4;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--sand);color:var(--ink);font:16px/1.5 "Source Sans 3",system-ui,sans-serif}
+a{color:var(--red)}
+h1,h2,h3{font-family:Calistoga,Georgia,serif;font-weight:400;margin:0 0 .4em;line-height:1.15}
+h1{font-size:2rem} h2{font-size:1.45rem} h3{font-size:1.1rem}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;padding:.55rem .7rem;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+textarea{min-height:120px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-offset:1px}
+label{display:block;font-weight:600;font-size:.9rem;margin:.8rem 0 .25rem}
+.hint{color:var(--muted);font-size:.85rem;font-weight:400}
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--sand);font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{background:#000}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{background:var(--paper)}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.btn.sm{padding:.25rem .7rem;font-size:.85rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+header.top{background:var(--ink);color:var(--sand);position:sticky;top:0;z-index:5}
+.top-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:1.2rem;padding:.7rem 1.2rem;flex-wrap:wrap}
+.brand{font-family:Calistoga,serif;font-size:1.35rem;color:var(--sand);text-decoration:none}
+.brand span{color:var(--red)}
+nav.tabs{display:flex;gap:.2rem;flex-wrap:wrap;flex:1}
+nav.tabs a{color:var(--sand);text-decoration:none;padding:.35rem .75rem;border-radius:999px;font-weight:600;font-size:.95rem;opacity:.8}
+nav.tabs a.on,nav.tabs a:hover{background:rgba(246,243,240,.14);opacity:1}
+.who{font-size:.85rem;opacity:.75}
+.who button{background:none;border:0;color:var(--sand);text-decoration:underline;cursor:pointer;padding:0 0 0 .4rem}
+main{max-width:1180px;margin:0 auto;padding:1.5rem 1.2rem 4rem}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:1.1rem 1.2rem}
+.stack>*+*{margin-top:.8rem}
+.row{display:flex;gap:.8rem;flex-wrap:wrap;align-items:flex-end}
+.row>*{flex:1;min-width:160px}
+.row>.shrink{flex:0 0 auto;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.8rem}
+.person-card{display:flex;gap:.8rem;align-items:center;text-decoration:none;color:inherit;background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:.75rem .9rem}
+.person-card:hover{border-color:var(--ink)}
+.avatar{width:46px;height:46px;border-radius:50%;background:var(--line);flex:0 0 46px;object-fit:cover;display:flex;align-items:center;justify-content:center;font-family:Calistoga,serif;color:var(--muted)}
+.avatar.lg{width:84px;height:84px;flex-basis:84px;font-size:1.6rem}
+.meta{color:var(--muted);font-size:.88rem}
+.pill{display:inline-block;padding:.08rem .55rem;border-radius:999px;font-size:.75rem;font-weight:700;letter-spacing:.02em;background:var(--sand);border:1px solid var(--line);text-transform:uppercase}
+.pill.red{background:var(--red-soft);border-color:#EFB9B9;color:#8E2023}
+.pill.ok{background:var(--ok-soft);border-color:#B7DDC4;color:var(--ok)}
+.pill.warn{background:var(--warn-soft);border-color:#EBD38F;color:var(--warn)}
+.subtabs{display:flex;gap:.3rem;border-bottom:1px solid var(--line);margin:1.2rem 0 1rem;flex-wrap:wrap}
+.subtabs button{background:none;border:0;padding:.55rem .9rem;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;color:var(--muted)}
+.subtabs button.on{color:var(--ink);border-color:var(--red)}
+.stmt{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:.9rem 1rem}
+.stmt .quote{white-space:pre-wrap;margin:.4rem 0;font-size:.98rem}
+.stmt .quote.clamp{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent)}
+.stmt .foot{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.linkish{background:none;border:0;color:var(--red);cursor:pointer;padding:0;font-weight:600;font-size:.85rem}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ink)}
+.banner{padding:.7rem 1rem;border-radius:8px;font-size:.92rem}
+.banner.warn{background:var(--warn-soft);border:1px solid #EBD38F}
+.banner.err{background:var(--red-soft);border:1px solid #EFB9B9}
+.banner.ok{background:var(--ok-soft);border:1px solid #B7DDC4}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+@media (max-width:720px){.vs{grid-template-columns:1fr}}
+.vs .side{background:var(--sand);border-radius:8px;padding:.7rem .8rem;font-size:.93rem}
+.vs .side .q{white-space:pre-wrap;max-height:14em;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);text-align:center;padding:2rem 1rem}
+.spinner{display:inline-block;width:1em;height:1em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.login{max-width:380px;margin:12vh auto 0}
+dialog{border:0;border-radius:var(--r);padding:0;max-width:560px;width:calc(100% - 2rem)}
+dialog::backdrop{background:rgba(28,24,9,.5)}
+dialog .card{border:0}
+.toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--sand);padding:.6rem 1.1rem;border-radius:999px;font-weight:600;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.toast.err{background:var(--red)}
+.k{font-weight:700}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ─────────── CONFIG: paste your Supabase project URL and anon (public) key ─────────── */
+const SUPABASE_URL = 'https://asgyshkafnrqknnmkbfo.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_fpHi1Cg3LIDcUkFK5O0IHg_nEoYFcx2';
+/* ───────────────────────────────────────────────────────────────────────────── */
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const safeUrl = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; } };
+const fmtDate = (d) => d ? new Date(d + (String(d).length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : 'Undated';
+const money = (n) => n == null ? '—' : '$' + Number(n).toLocaleString('en-AU', { maximumFractionDigits: 0 });
+const initials = (n) => String(n || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+const SOURCE_LABEL = { hansard:'Hansard', media:'Media', social:'Social', radio:'Radio', podcast:'Podcast', video:'Video', document:'Document', other:'Other' };
+const CHAMBER_LABEL = { house:'House of Reps', senate:'Senate', lower:'Lower house', upper:'Upper house', council:'Council', none:'—' };
+const JURIS = ['federal','nsw','vic','qld','wa','sa','tas','act','nt','local'];
+
+let session = null, me = null, PEOPLE = [], peopleLoaded = false;
+
+function toast(msg, err = false) {
+  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), err ? 5000 : 2600);
+}
+async function api(path, opts = {}) {
+  const { data: { session: s } } = await sb.auth.getSession();
+  const res = await fetch(`/.netlify/functions/${path}`, { ...opts, headers: { 'Content-Type':'application/json', Authorization: `Bearer ${s?.access_token || ''}`, ...(opts.headers || {}) } });
+  return res;
+}
+function personName(id) { return PEOPLE.find(p => p.id === id)?.full_name || 'Unknown'; }
+async function loadPeople(force = false) {
+  if (peopleLoaded && !force) return PEOPLE;
+  const all = []; let from = 0;
+  while (true) {
+    const { data, error } = await sb.from('gf_people').select('id,full_name,first_name,last_name,party,chamber,electorate,state,status,jurisdiction,photo_url,offices,created_by,council,ward').order('last_name').range(from, from + 999);
+    if (error) { toast(error.message, true); break; }
+    all.push(...data); if (data.length < 1000) break; from += 1000;
+  }
+  PEOPLE = all; peopleLoaded = true; return PEOPLE;
+}
+function avatar(p, lg = false) {
+  const u = safeUrl(p.photo_url);
+  return u ? `<img class="avatar${lg ? ' lg' : ''}" src="${esc(u)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;avatar${lg ? ' lg' : ''}&quot;>${esc(initials(p.full_name))}</div>'">`
+           : `<div class="avatar${lg ? ' lg' : ''}">${esc(initials(p.full_name))}</div>`;
+}
+function personMeta(p) {
+  if (p.chamber === 'council') return [p.party, p.council ? `${p.council} Council` : 'Council', p.ward].filter(Boolean).map(esc).join(' · ');
+  return [p.party, CHAMBER_LABEL[p.chamber] || p.chamber, p.electorate, p.jurisdiction !== 'federal' ? (p.jurisdiction || '').toUpperCase() : null].filter(Boolean).map(esc).join(' · ');
+}
+
+/* ─────────── Shell & routing ─────────── */
+const ROUTES = [['people','People'],['search','Search'],['capture','Capture'],['money','Money'],['watches','Watches'],['admin','Admin']];
+function shell() {
+  $('#app').innerHTML = `
+  <header class="top"><div class="top-inner">
+    <a class="brand" href="#people"><span>G</span>FILE</a>
+    <nav class="tabs">${ROUTES.map(([k, l]) => `<a href="#${k}" data-r="${k}">${l}</a>`).join('')}</nav>
+    <div class="who">${esc(me?.email || '')}<button id="signout">Sign out</button></div>
+  </div></header>
+  <main id="view"></main>`;
+  $('#signout').onclick = async () => { await sb.auth.signOut(); location.hash = ''; boot(); };
+}
+async function route() {
+  if (!session) return;
+  const [r, arg] = (location.hash.slice(1) || 'people').split('/');
+  $$('nav.tabs a').forEach(a => a.classList.toggle('on', a.dataset.r === (r === 'person' ? 'people' : r)));
+  const v = $('#view'); v.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+  await loadPeople();
+  ({ people: viewPeople, person: () => viewPerson(arg), search: viewSearch, capture: () => viewCapture(arg), money: viewMoney, watches: viewWatches, admin: viewAdmin }[r] || viewPeople)();
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+/* ─────────── Login ─────────── */
+function viewLogin() {
+  $('#app').innerHTML = `
+  <div class="login card stack">
+    <h1><span style="color:var(--red)">G</span>FILE</h1>
+    <p class="meta">What politicians have said, how they voted, and who funds them. Sign in with your Gazette account.</p>
+    <form id="lf" class="stack">
+      <div><label for="em">Email</label><input id="em" type="email" autocomplete="username" required></div>
+      <div><label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      <button class="btn" type="submit">Sign in</button>
+      <div id="lerr"></div>
+    </form>
+  </div>`;
+  $('#lf').onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+    if (error) $('#lerr').innerHTML = `<div class="banner err">${esc(error.message)}</div>`; else boot();
+  };
+}
+
+/* ─────────── People ─────────── */
+let peopleFilters = { q:'', chamber:'', status:'sitting', party:'', juris:'' };
+function viewPeople() {
+  const parties = [...new Set(PEOPLE.map(p => p.party).filter(Boolean))].sort();
+  $('#view').innerHTML = `
+  <div class="row" style="align-items:center;margin-bottom:1rem">
+    <div><h1 style="margin:0">People</h1><div class="meta" id="pcount"></div></div>
+    <div class="shrink"><button class="btn ghost" id="addp">+ Add a person</button></div>
+  </div>
+  <div class="card row" style="margin-bottom:1rem">
+    <div style="flex:2"><label for="fq">Name or seat</label><input id="fq" placeholder="e.g. Chalmers, Wentworth, Northern Beaches" value="${esc(peopleFilters.q)}"></div>
+    <div><label for="fj">Level</label><select id="fj"><option value="">All</option>${JURIS.map(j => `<option value="${j}">${j === 'federal' ? 'Federal' : j === 'local' ? 'Local' : j.toUpperCase()}</option>`).join('')}</select></div>
+    <div><label for="fc">Chamber</label><select id="fc"><option value="">All</option>${Object.entries(CHAMBER_LABEL).filter(([k]) => k !== 'none').map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+    <div><label for="fp">Party</label><select id="fp"><option value="">All</option>${parties.map(p => `<option>${esc(p)}</option>`).join('')}</select></div>
+    <div><label for="fs">Status</label><select id="fs"><option value="">All</option><option value="sitting">Sitting</option><option value="candidate">Candidate</option><option value="former">Former</option></select></div>
+  </div>
+  <div class="grid" id="plist"></div>`;
+  $('#fj').value = peopleFilters.juris; $('#fc').value = peopleFilters.chamber; $('#fp').value = peopleFilters.party; $('#fs').value = peopleFilters.status;
+  const draw = () => {
+    const f = peopleFilters, q = f.q.toLowerCase();
+    const list = PEOPLE.filter(p =>
+      (!q || [p.full_name, p.electorate, p.council, p.ward].some(v => (v || '').toLowerCase().includes(q))) &&
+      (!f.chamber || p.chamber === f.chamber) && (!f.status || p.status === f.status) &&
+      (!f.party || p.party === f.party) && (!f.juris || p.jurisdiction === f.juris));
+    $('#pcount').textContent = `${list.length} of ${PEOPLE.length}`;
+    $('#plist').innerHTML = list.length ? list.slice(0, 400).map(p => `
+      <a class="person-card" href="#person/${p.id}">${avatar(p)}
+        <div><div class="k">${esc(p.full_name)}</div><div class="meta">${personMeta(p)}</div>
+        ${p.status !== 'sitting' ? `<span class="pill${p.status === 'candidate' ? ' warn' : ''}">${esc(p.status)}</span>` : ''}</div></a>`).join('')
+      : `<div class="empty" style="grid-column:1/-1">${PEOPLE.length ? 'Nobody matches those filters.' : 'No one on file yet. Run the first sync from the Admin tab.'}</div>`;
+  };
+  $('#fq').oninput = e => { peopleFilters.q = e.target.value; draw(); };
+  [['#fj','juris'],['#fc','chamber'],['#fp','party'],['#fs','status']].forEach(([s, k]) => $(s).onchange = e => { peopleFilters[k] = e.target.value; draw(); });
+  $('#addp').onclick = () => personDialog();
+  draw();
+}
+
+function personDialog(existing) {
+  const p = existing || { jurisdiction:'nsw', chamber:'lower', status:'candidate' };
+  const d = document.createElement('dialog');
+  d.innerHTML = `<form class="card" method="dialog" id="pf">
+    <h2>${existing ? 'Edit person' : 'Add a person'}</h2>
+    <p class="meta">Federal MPs and senators sync automatically. Add state MPs, candidates and councillors here.</p>
+    <label>Full name</label><input name="full_name" required value="${esc(p.full_name || '')}">
+    <div class="row">
+      <div><label>Level</label><select name="jurisdiction">${JURIS.map(j => `<option value="${j}" ${p.jurisdiction === j ? 'selected' : ''}>${j === 'local' ? 'Local' : j === 'federal' ? 'Federal' : j.toUpperCase()}</option>`).join('')}</select></div>
+      <div><label>Chamber</label><select name="chamber">${Object.entries(CHAMBER_LABEL).map(([k, l]) => `<option value="${k}" ${p.chamber === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div><label>Status</label><select name="status">${['sitting','candidate','former'].map(s => `<option ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div><label>Party</label><input name="party" value="${esc(p.party || '')}" placeholder="Independent"></div>
+      <div><label>Seat <span class="hint">(state/federal)</span></label><input name="electorate" value="${esc(p.electorate || '')}"></div>
+    </div>
+    <div class="row">
+      <div><label>Council <span class="hint">(councillors: exact LGA name)</span></label><input name="council" value="${esc(p.council || '')}" placeholder="e.g. Northern Beaches"></div>
+      <div><label>Ward</label><input name="ward" value="${esc(p.ward || '')}"></div>
+    </div>
+    <label>Photo URL <span class="hint">(optional)</span></label><input name="photo_url" value="${esc(p.photo_url || '')}">
+    <label>Notes <span class="hint">(career, previous roles, business ties)</span></label><textarea name="notes">${esc(p.notes || '')}</textarea>
+    <div class="row" style="margin-top:1rem"><div class="shrink"><button class="btn" value="save">Save</button></div><div class="shrink"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button></div></div>
+  </form>`;
+  document.body.appendChild(d); d.showModal();
+  d.addEventListener('close', async () => {
+    if (d.returnValue === 'save') {
+      const fd = Object.fromEntries(new FormData($('#pf', d)));
+      const parts = fd.full_name.trim().split(/\s+/);
+      const row = { ...fd, full_name: fd.full_name.trim(), first_name: parts.slice(0, -1).join(' ') || null, last_name: parts.slice(-1)[0], photo_url: safeUrl(fd.photo_url) || null, council: fd.council.trim() || null, ward: fd.ward.trim() || null };
+      const q = existing ? sb.from('gf_people').update(row).eq('id', existing.id).select().single()
+                         : sb.from('gf_people').insert({ ...row, created_by: me.id }).select().single();
+      const { data, error } = await q;
+      if (error) toast(error.message, true);
+      else { toast('Saved'); await loadPeople(true); location.hash = `#person/${data.id}`; route(); }
+    }
+    d.remove();
+  });
+}
+
+
+function researchLine(p) {
+  const bits = [];
+  if ((p.aliases || []).length) bits.push(`Also known as: ${p.aliases.map(esc).join(', ')}`);
+  if (p.handles?.twitter) bits.push(`Twitter/X: @${esc(String(p.handles.twitter).replace(/^@/, ''))}`);
+  if ((p.old_urls || []).length) bits.push(`Old sites: ${p.old_urls.map(esc).join(', ')}`);
+  return bits.length ? `<div class="meta" style="margin-top:.3rem">${bits.join(' · ')}</div>` : '';
+}
+function researchDialog(p) {
+  const d = document.createElement('dialog');
+  d.innerHTML = `<form class="card" method="dialog" id="rf">
+    <h2>Research details</h2>
+    <p class="meta">These make the old-media scan much better. Anyone can edit them.</p>
+    <label>Other names <span class="hint">(maiden name, nickname, how they were known at uni — comma separated)</span></label><input name="aliases" value="${esc((p.aliases || []).join(', '))}">
+    <label>Twitter/X handle <span class="hint">(archived tweets get pulled from the Wayback Machine)</span></label><input name="twitter" value="${esc(p.handles?.twitter || '')}" placeholder="@handle">
+    <label>Old websites <span class="hint">(personal, campaign, business, blog — one per line)</span></label><textarea name="old_urls" style="min-height:70px">${esc((p.old_urls || []).join('\n'))}</textarea>
+    <label>Background notes <span class="hint">(previous jobs, hometown, uni, unions, businesses — used to search)</span></label><textarea name="notes">${esc(p.notes || '')}</textarea>
+    <div class="row" style="margin-top:1rem"><div class="shrink"><button class="btn" value="save">Save</button></div><div class="shrink"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button></div></div>
+  </form>`;
+  document.body.appendChild(d); d.showModal();
+  d.addEventListener('close', async () => {
+    if (d.returnValue === 'save') {
+      const fd = Object.fromEntries(new FormData($('#rf', d)));
+      const handles = { ...(p.handles || {}) };
+      const tw = fd.twitter.trim().replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, '').replace(/^@/, '').split(/[/?]/)[0];
+      if (tw) handles.twitter = tw; else delete handles.twitter;
+      const { error } = await sb.rpc('gf_update_person_research', {
+        p_person: p.id,
+        p_aliases: fd.aliases.split(',').map(x => x.trim()).filter(Boolean),
+        p_handles: handles,
+        p_old_urls: fd.old_urls.split(/\n+/).map(x => x.trim()).filter(Boolean),
+        p_notes: fd.notes.trim() || null,
+      });
+      error ? toast(error.message, true) : (toast('Saved'), viewPerson(p.id));
+    }
+    d.remove();
+  });
+}
+
+/* Old media */
+const LEAD_KIND = { web:'Web', tweet:'Archived tweet', archive:'Old website', video:'Video', trove:'Trove' };
+const LEAD_TO_SOURCE = { web:'media', tweet:'social', archive:'document', video:'video', trove:'media' };
+async function tabOldMedia(p) {
+  const el = $('#ptab');
+  const yr = new Date().getFullYear();
+  el.innerHTML = `
+    <div class="card stack">
+      <h3 style="margin:0">Old media scan</h3>
+      <div class="meta">Searches the web for old interviews, transcripts, op-eds, profiles and student media; pulls archived tweets and old websites from the Wayback Machine; and checks YouTube and Trove. AI suggests quotes, but a quote is only kept if its exact words are on the page. Everything lands below for you to keep or dismiss.</div>
+      ${researchLine(p) || `<div class="banner warn">Add their old Twitter handle, websites and other names under <b>Research details</b> first. It makes a big difference.</div>`}
+      <form id="sf2" class="row">
+        <div><label for="by">Published before</label><input id="by" type="number" min="1950" max="${yr + 1}" value="2013"></div>
+        <div class="shrink" style="padding-bottom:.55rem"><label style="display:flex;gap:.4rem;align-items:center;font-weight:400"><input type="checkbox" id="anytime" style="width:auto"> Any date</label></div>
+        <div class="shrink"><button class="btn red" type="submit">Run deep scan</button></div>
+      </form>
+      <div class="hint">Takes 2–5 minutes. Daily limit per reporter applies.</div>
+      <div id="scanstat"></div>
+    </div>
+    <div class="row" style="margin:1rem 0 .5rem;align-items:center">
+      <div><h3 style="margin:0">Leads</h3></div>
+      <div class="shrink"><select id="lst"><option value="new">To review</option><option value="kept">Kept</option><option value="dismissed">Dismissed</option><option value="">All</option></select></div>
+      <div class="shrink"><select id="lkd"><option value="">All types</option>${Object.entries(LEAD_KIND).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+    </div>
+    <div id="leads" class="stack"></div>`;
+  const drawLeads = async () => {
+    let q = sb.from('gf_leads').select('*').eq('person_id', p.id).order('year', { ascending:true, nullsFirst:false }).limit(300);
+    if ($('#lst').value) q = q.eq('status', $('#lst').value);
+    if ($('#lkd').value) q = q.eq('kind', $('#lkd').value);
+    const { data, error } = await q; if (error) return toast(error.message, true);
+    $('#leads').innerHTML = data.length ? data.map(l => {
+      const url = safeUrl(l.url.replace(/#\d{4}$/, '')), arch = safeUrl(l.archive_url);
+      return `<div class="stmt" data-lead="${l.id}">
+        <div class="foot"><span class="pill${l.kind === 'tweet' ? ' red' : ''}">${esc(LEAD_KIND[l.kind] || l.kind)}</span>
+          <span class="k" style="color:var(--ink)">${l.published_on ? fmtDate(l.published_on) : (l.year || 'Date unknown')}</span>
+          ${l.outlet ? `<span>${esc(l.outlet)}</span>` : ''}
+          ${l.status !== 'new' ? `<span class="pill ${l.status === 'kept' ? 'ok' : ''}">${esc(l.status)}</span>` : ''}</div>
+        <div class="k" style="margin:.3rem 0">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="color:var(--ink)">${esc(l.title || url)}</a>` : esc(l.title || '')}</div>
+        ${l.snippet ? `<div class="meta">${esc(l.snippet)}</div>` : ''}
+        ${(l.quotes || []).map((q, i) => `<div class="side" style="background:var(--sand);border-radius:8px;padding:.6rem .8rem;margin-top:.5rem">
+            <div class="quote" style="margin:0">“${esc(q.text)}”</div>
+            <div class="foot" style="margin-top:.3rem"><span class="pill ok">Words found on page</span><button class="linkish" data-file="${i}">File this quote</button></div></div>`).join('')}
+        <div class="foot" style="margin-top:.5rem">
+          ${arch ? `<a href="${esc(arch)}" target="_blank" rel="noopener">Archived copy ↗</a>` : ''}
+          ${l.status !== 'kept' ? '<button class="linkish" data-st="kept">Keep</button>' : ''}
+          ${l.status !== 'dismissed' ? '<button class="linkish" data-st="dismissed" style="color:var(--muted)">Dismiss</button>' : ''}
+          <button class="linkish" data-cap>Capture manually</button>
+        </div></div>`;
+    }).join('') : `<div class="empty">${$('#lst').value === 'new' ? 'Nothing to review. Run a deep scan.' : 'Nothing here.'}</div>`;
+    const byId = new Map(data.map(l => [l.id, l]));
+    $$('[data-lead]', $('#leads')).forEach(card => {
+      const l = byId.get(card.dataset.lead);
+      $$('[data-st]', card).forEach(b => b.onclick = async () => { const { error } = await sb.rpc('gf_review_lead', { p_lead: l.id, p_status: b.dataset.st }); error ? toast(error.message, true) : drawLeads(); });
+      $$('[data-file]', card).forEach(b => b.onclick = async () => {
+        const q = l.quotes[Number(b.dataset.file)];
+        const { error } = await sb.from('gf_statements').insert({
+          person_id: p.id, said_on: l.published_on || null, source_type: LEAD_TO_SOURCE[l.kind] || 'media',
+          source_title: [l.outlet, l.title].filter(Boolean).join(' · ').slice(0, 300) || null,
+          source_url: safeUrl(l.archive_url) || safeUrl(l.url.replace(/#\d{4}$/, '')) || null, quote: q.text,
+          context: `Found by the old-media scan${l.published_on ? '' : ` (date not confirmed${l.year ? `; around ${l.year}` : ''})`}. Exact words checked against the page text automatically. Read the full source before using.`,
+          topics: [], added_by: me.id,
+        });
+        if (error) return toast(error.message, true);
+        await sb.rpc('gf_review_lead', { p_lead: l.id, p_status: 'kept' });
+        toast('Filed to the record'); drawLeads();
+      });
+      $('[data-cap]', card).onclick = () => { window.__prefill = { url: safeUrl(l.archive_url) || safeUrl(l.url.replace(/#\d{4}$/, '')), title: [l.outlet, l.title].filter(Boolean).join(' · '), date: l.published_on, type: LEAD_TO_SOURCE[l.kind] }; location.hash = `#capture/${p.id}`; };
+    });
+  };
+  const watch = async (id) => {
+    for (let i = 0; i < 120; i++) {
+      const { data: s } = await sb.from('gf_scans').select('*').eq('id', id).single();
+      if (!s) return;
+      if (s.status === 'done') {
+        const m = s.summary || {};
+        $('#scanstat').innerHTML = `<div class="banner ok">Done: ${m.total || 0} leads. ${m.web || 0} web pages (${m.web_verified_quotes || 0} quotes verified${m.web_dropped ? `, ${m.web_dropped} unverifiable quotes thrown out` : ''}), ${m.tweets || 0} archived tweets, ${m.archives || 0} old site snapshots, ${m.videos || 0} videos, ${m.trove || 0} Trove articles.${(m.errors || []).length ? `<br><span class="meta">Problems: ${esc(m.errors.join('; '))}</span>` : ''}</div>`;
+        $('#lst').value = 'new'; return drawLeads();
+      }
+      if (s.status === 'error') { $('#scanstat').innerHTML = `<div class="banner err">${esc(s.error || 'Scan failed')}</div>`; return; }
+      $('#scanstat').innerHTML = `<div class="banner warn"><span class="spinner"></span> Scanning… you can leave this page and come back.</div>`;
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  };
+  $('#sf2').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = $('#sf2 button'); btn.disabled = true;
+    const before_year = $('#anytime').checked ? null : Number($('#by').value) || 2013;
+    const { data: s, error } = await sb.from('gf_scans').insert({ person_id: p.id, before_year }).select().single();
+    if (error) { btn.disabled = false; return toast(error.message, true); }
+    const res = await api('scan-background', { method:'POST', body: JSON.stringify({ scan_id: s.id }) });
+    btn.disabled = false;
+    if (!res.ok && res.status !== 202) return toast(`Couldn't start the scan (${res.status})`, true);
+    watch(s.id);
+  };
+  $('#lst').onchange = drawLeads; $('#lkd').onchange = drawLeads;
+  drawLeads();
+  const { data: running } = await sb.from('gf_scans').select('id').eq('person_id', p.id).in('status', ['queued','running']).order('created_at', { ascending:false }).limit(1);
+  if (running?.length) watch(running[0].id);
+}
+
+/* Council record */
+const ACTION_LABEL = { moved:'Moved', seconded:'Seconded', voted_for:'Voted for', voted_against:'Voted against', declared_interest:'Declared interest' };
+async function tabCouncil(p) {
+  const el = $('#ptab');
+  const { data, error } = await sb.from('gf_council_actions').select('*').eq('person_id', p.id).order('meeting_date', { ascending:false, nullsFirst:false }).limit(500);
+  if (error) return toast(error.message, true);
+  if (!data.length) { el.innerHTML = `<div class="empty">Nothing from council minutes yet.${p.council ? '' : ' Set their council name (Edit) so minutes can be matched to them.'} Add the council's minutes page under Admin → Sources.</div>`; return; }
+  const counts = data.reduce((a, x) => (a[x.action] = (a[x.action] || 0) + 1, a), {});
+  el.innerHTML = `<div class="card stack">
+    <div class="row">${Object.entries(ACTION_LABEL).map(([k, l]) => `<div class="shrink"><span class="k">${counts[k] || 0}</span> <span class="meta">${l.toLowerCase()}</span></div>`).join('')}</div>
+    <input id="cq2" placeholder="Filter, e.g. development, park, rates">
+    <table><thead><tr><th style="width:14%">Meeting</th><th style="width:16%">Action</th><th>Item</th></tr></thead><tbody id="ct2"></tbody></table>
+    <div class="hint">From official minutes, read automatically. Check the minutes before relying on any line.</div></div>`;
+  const draw = () => {
+    const q = $('#cq2').value.toLowerCase();
+    $('#ct2').innerHTML = data.filter(a => !q || `${a.item} ${a.detail}`.toLowerCase().includes(q)).map(a => `<tr>
+      <td>${safeUrl(a.source_url) ? `<a href="${esc(safeUrl(a.source_url))}" target="_blank" rel="noopener">${fmtDate(a.meeting_date)}</a>` : fmtDate(a.meeting_date)}</td>
+      <td><span class="pill ${a.action === 'voted_against' ? 'red' : a.action === 'declared_interest' ? 'warn' : ''}">${esc(ACTION_LABEL[a.action] || a.action)}</span></td>
+      <td><div class="k">${esc(a.item || '')}</div>${a.detail ? `<div class="meta" style="white-space:pre-wrap">${esc(a.detail.slice(0, 600))}</div>` : ''}</td></tr>`).join('');
+  };
+  $('#cq2').oninput = draw; draw();
+}
+
+/* ─────────── Person file ─────────── */
+let personTab = 'timeline';
+async function viewPerson(id) {
+  const { data: p, error } = await sb.from('gf_people').select('*').eq('id', id).single();
+  if (error || !p) { $('#view').innerHTML = `<div class="empty">Couldn't find that person.</div>`; return; }
+  const { count } = await sb.from('gf_statements').select('id', { count:'exact', head:true }).eq('person_id', id);
+  const offices = Array.isArray(p.offices) ? p.offices : [];
+  $('#view').innerHTML = `
+  <div class="card row" style="align-items:center">
+    <div class="shrink">${avatar(p, true)}</div>
+    <div style="flex:3">
+      <h1 style="margin-bottom:.1rem">${esc(p.full_name)}</h1>
+      <div class="meta">${personMeta(p)} ${p.status !== 'sitting' ? `· <span class="pill">${esc(p.status)}</span>` : ''}</div>
+      ${offices.length ? `<div class="meta" style="margin-top:.2rem">${offices.map(esc).join(' · ')}</div>` : ''}
+      ${p.notes ? `<div style="margin-top:.4rem;white-space:pre-wrap">${esc(p.notes)}</div>` : ''}
+      ${researchLine(p)}
+    </div>
+    <div class="shrink" style="text-align:right">
+      <div><span class="k">${count ?? 0}</span> <span class="meta">statements on file</span></div>
+      ${p.votes_possible ? `<div><span class="k">${Math.round(100 * p.votes_attended / p.votes_possible)}%</span> <span class="meta">divisions attended</span></div>` : ''}
+      ${p.rebellions != null ? `<div><span class="k">${p.rebellions}</span> <span class="meta">votes against party</span></div>` : ''}
+      <div class="row" style="justify-content:flex-end;margin-top:.5rem">
+        <a class="btn sm shrink" href="#capture/${p.id}">+ Capture</a>
+        ${p.created_by === me.id ? `<button class="btn ghost sm shrink" id="editp">Edit</button>` : ''}
+        <button class="btn ghost sm shrink" id="researchp">Research details</button>
+      </div>
+    </div>
+  </div>
+  <div class="subtabs">${[['timeline','Statements'],['oldmedia','Old media'],['check','Contradiction check'],...(p.chamber === 'council' ? [['council','Council record']] : [['votes','Votes']]),['money','Money'],['interests','Interests']].map(([k, l]) => `<button data-t="${k}" class="${personTab === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div id="ptab"></div>`;
+  if ($('#editp')) $('#editp').onclick = () => personDialog(p);
+  $('#researchp').onclick = () => researchDialog(p);
+  if (personTab === 'council' && p.chamber !== 'council') personTab = 'timeline';
+  if (personTab === 'votes' && p.chamber === 'council') personTab = 'council';
+  $$('.subtabs button').forEach(b => b.classList.toggle('on', b.dataset.t === personTab));
+  $$('.subtabs button').forEach(b => b.onclick = () => { personTab = b.dataset.t; $$('.subtabs button').forEach(x => x.classList.toggle('on', x === b)); drawPersonTab(p); });
+  drawPersonTab(p);
+}
+function drawPersonTab(p) {
+  ({ timeline: tabTimeline, oldmedia: tabOldMedia, check: tabCheck, votes: tabVotes, council: tabCouncil, money: tabMoney, interests: tabInterests }[personTab] || tabTimeline)(p);
+}
+
+function stmtCard(s, opts = {}) {
+  const long = (s.quote || '').length > 650;
+  const url = safeUrl(s.source_url);
+  return `<div class="stmt" data-id="${s.id}">
+    <div class="foot">
+      ${opts.showPerson ? `<a href="#person/${s.person_id}" class="k" style="color:var(--ink)">${esc(personName(s.person_id))}</a> ·` : ''}
+      <span class="k" style="color:var(--ink)">${fmtDate(s.said_on)}</span>
+      <span class="pill${s.source_type === 'hansard' ? '' : ' red'}">${esc(SOURCE_LABEL[s.source_type] || s.source_type)}</span>
+      ${s.verified ? '<span class="pill ok">Verified</span>' : ''}
+      ${s.source_title ? `<span>${esc(s.source_title)}</span>` : ''}
+    </div>
+    <div class="quote${long ? ' clamp' : ''}">${esc(s.quote)}</div>
+    ${long ? '<button class="linkish more">Show full text</button>' : ''}
+    ${s.context ? `<div class="meta" style="margin-top:.3rem"><b>Context:</b> ${esc(s.context)}</div>` : ''}
+    <div class="foot" style="margin-top:.4rem">
+      ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">Open source ↗</a>` : '<span>No link</span>'}
+      ${(s.topics || []).map(t => `<span class="pill">${esc(t)}</span>`).join(' ')}
+      ${s.added_by && s.added_by === me.id && !s.verified ? `<button class="linkish verify">Mark verified</button>` : ''}
+      ${s.added_by && s.added_by === me.id ? `<button class="linkish del" style="color:var(--muted)">Delete</button>` : ''}
+    </div>
+  </div>`;
+}
+function wireStmtCards(root, onChange) {
+  $$('.more', root).forEach(b => b.onclick = () => { b.previousElementSibling.classList.remove('clamp'); b.remove(); });
+  $$('.verify', root).forEach(b => b.onclick = async () => {
+    const id = b.closest('.stmt').dataset.id;
+    const { error } = await sb.from('gf_statements').update({ verified: true }).eq('id', id);
+    error ? toast(error.message, true) : (toast('Marked verified'), onChange && onChange());
+  });
+  $$('.del', root).forEach(b => b.onclick = async () => {
+    if (!confirm('Delete this statement from the record?')) return;
+    const id = b.closest('.stmt').dataset.id;
+    const { error } = await sb.from('gf_statements').delete().eq('id', id);
+    error ? toast(error.message, true) : (toast('Deleted'), onChange && onChange());
+  });
+}
+
+async function tabTimeline(p) {
+  const el = $('#ptab');
+  el.innerHTML = `<div class="card row" style="margin-bottom:.8rem">
+      <div style="flex:3"><label for="tq">Search their statements</label><input id="tq" placeholder='e.g. nuclear, "negative gearing", gas -export'></div>
+      <div><label for="ts">Source</label><select id="ts"><option value="">All</option>${Object.entries(SOURCE_LABEL).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+    </div><div id="tl" class="stack"></div>`;
+  let page = 0;
+  const load = async (reset = true) => {
+    if (reset) { page = 0; $('#tl').innerHTML = '<div class="empty"><span class="spinner"></span></div>'; }
+    const q = $('#tq').value.trim(), src = $('#ts').value;
+    let rows;
+    if (q) {
+      const { data, error } = await sb.rpc('gf_search_statements', { q, p_person: p.id, max_rows: 200 });
+      if (error) return toast(error.message, true);
+      rows = src ? data.filter(r => r.source_type === src) : data;
+      const { data: own } = await sb.from('gf_statements').select('id,added_by').in('id', rows.map(r => r.id).slice(0, 200));
+      const by = new Map((own || []).map(o => [o.id, o.added_by])); rows.forEach(r => r.added_by = by.get(r.id));
+    } else {
+      let qb = sb.from('gf_statements').select('*').eq('person_id', p.id).order('said_on', { ascending:false, nullsFirst:false }).range(page * 50, page * 50 + 49);
+      if (src) qb = qb.eq('source_type', src);
+      const { data, error } = await qb; if (error) return toast(error.message, true); rows = data;
+    }
+    const html = rows.map(s => stmtCard(s)).join('');
+    if (reset) $('#tl').innerHTML = html || `<div class="empty">Nothing on file${q ? ' matching that search' : ''}. <a href="#capture/${p.id}">Capture a statement</a>${p.jurisdiction === 'federal' ? ' or try a live Hansard search in Search.' : '.'}</div>`;
+    else { $('#tl .loadmore')?.remove(); $('#tl').insertAdjacentHTML('beforeend', html); }
+    if (!q && rows.length === 50) { $('#tl').insertAdjacentHTML('beforeend', '<button class="btn ghost loadmore">Load more</button>'); $('#tl .loadmore').onclick = () => { page++; load(false); }; }
+    wireStmtCards($('#tl'), () => load());
+  };
+  let t; $('#tq').oninput = () => { clearTimeout(t); t = setTimeout(load, 350); }; $('#ts').onchange = () => load();
+  load();
+}
+
+/* Contradiction check */
+const VERDICT = { clear_reversal:['Clear reversal','red'], shift:['Position shifted','warn'], consistent:['Consistent','ok'], insufficient_evidence:['Not enough on file',''] };
+async function tabCheck(p) {
+  const el = $('#ptab');
+  el.innerHTML = `
+    <div class="card stack">
+      <div class="banner warn"><b>This is a lead, not a finding.</b> The AI only compares what's on file. Before publishing, read every statement in full at its source, check what was happening at the time, and give ${esc(p.full_name)} a fair right of reply.</div>
+      <form id="cf" class="row">
+        <div style="flex:3"><label for="ct">Topic</label><input id="ct" required placeholder="e.g. nuclear power, negative gearing, Adani"></div>
+        <div class="shrink"><button class="btn red" type="submit">Run check</button></div>
+      </form>
+      <div class="hint">Works best with a few specific words. Daily limit per reporter applies.</div>
+    </div>
+    <div id="cres" class="stack" style="margin-top:1rem"></div>
+    <h3 style="margin-top:1.5rem">Earlier checks</h3><div id="chist" class="stack"></div>`;
+  const history = async () => {
+    const { data } = await sb.from('gf_checks').select('id,topic,status,created_at,result').eq('person_id', p.id).order('created_at', { ascending:false }).limit(20);
+    $('#chist').innerHTML = (data || []).map(c => `<div class="stmt" style="display:flex;justify-content:space-between;align-items:center;gap:1rem">
+      <div><span class="k">${esc(c.topic)}</span> <span class="meta">· ${new Date(c.created_at).toLocaleString('en-AU')}</span></div>
+      <div>${c.status === 'done' ? `<span class="pill ${VERDICT[c.result?.verdict]?.[1] || ''}">${esc(VERDICT[c.result?.verdict]?.[0] || 'Done')}</span>` : `<span class="pill">${esc(c.status)}</span>`}
+      <button class="linkish" data-open="${c.id}" style="margin-left:.5rem">Open</button></div></div>`).join('') || '<div class="meta">None yet.</div>';
+    $$('[data-open]', $('#chist')).forEach(b => b.onclick = () => showCheck(b.dataset.open));
+  };
+  const showCheck = async (id) => {
+    $('#cres').innerHTML = '<div class="card"><span class="spinner"></span> Checking the record…</div>';
+    for (let i = 0; i < 60; i++) {
+      const { data: c } = await sb.from('gf_checks').select('*').eq('id', id).single();
+      if (c && (c.status === 'done' || c.status === 'error')) { await renderCheck(c); history(); return; }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    $('#cres').innerHTML = '<div class="banner err">Still running after three minutes. Check back in Earlier checks.</div>';
+  };
+  $('#cf').onsubmit = async (e) => {
+    e.preventDefault();
+    const topic = $('#ct').value.trim(); if (!topic) return;
+    const btn = $('#cf button'); btn.disabled = true;
+    const { data: c, error } = await sb.from('gf_checks').insert({ person_id: p.id, topic }).select().single();
+    if (error) { btn.disabled = false; return toast(error.message, true); }
+    const res = await api('check-background', { method:'POST', body: JSON.stringify({ check_id: c.id }) });
+    btn.disabled = false;
+    if (!res.ok && res.status !== 202) return toast(`Couldn't start the check (${res.status})`, true);
+    showCheck(c.id);
+  };
+  history();
+}
+async function renderCheck(c) {
+  if (c.status === 'error') { $('#cres').innerHTML = `<div class="banner err">${esc(c.error || 'Check failed')}</div>`; return; }
+  const r = c.result || {};
+  const ids = [...new Set([...(r.timeline || []).flatMap(t => t.statement_ids || []), ...(r.tensions || []).flatMap(t => [t.earlier_id, t.later_id])].filter(id => id && !id.startsWith('policy:')))];
+  let byId = new Map();
+  if (ids.length) { const { data } = await sb.from('gf_statements').select('id,said_on,source_type,source_title,source_url,quote').in('id', ids); byId = new Map((data || []).map(s => [s.id, s])); }
+  const votes = new Map((r.votes || []).map(v => [`policy:${v.tvfy_policy_id}`, v]));
+  const side = (id, label) => {
+    if (votes.has(id)) { const v = votes.get(id); return `<div class="side"><div class="meta k">${label} · Voting record</div><div class="q"><b>${esc(v.policy_name)}</b><br>Voted with this policy ${esc(Math.round(v.agreement))}% of the time.</div><a href="https://theyvoteforyou.org.au/policies/${encodeURIComponent(v.tvfy_policy_id)}" target="_blank" rel="noopener">They Vote For You ↗</a></div>`; }
+    const s = byId.get(id); if (!s) return `<div class="side meta">Statement no longer on file.</div>`;
+    const url = safeUrl(s.source_url);
+    return `<div class="side"><div class="meta k">${label} · ${fmtDate(s.said_on)} · ${esc(SOURCE_LABEL[s.source_type] || '')}</div><div class="q">${esc(s.quote)}</div>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">Source ↗</a>` : ''}</div>`;
+  };
+  const [vl, vc] = VERDICT[r.verdict] || ['Done',''];
+  $('#cres').innerHTML = `
+    <div class="card stack">
+      <div class="row" style="align-items:center"><div><h2 style="margin:0">${esc(c.topic)}</h2></div><div class="shrink"><span class="pill ${vc}" style="font-size:.85rem">${esc(vl)}</span></div></div>
+      <p style="margin:0">${esc(r.summary || '')}</p>
+      ${r.story_angle ? `<div class="banner ok"><b>Possible angle:</b> ${esc(r.story_angle)}</div>` : ''}
+      <div class="meta">Compared ${(r.used_ids || []).length} statements${(r.votes || []).length ? ` and ${r.votes.length} voting records` : ''}.${r.dropped_invalid ? ` ${r.dropped_invalid} unsupported claim(s) were discarded.` : ''}</div>
+    </div>
+    ${(r.tensions || []).map(t => `
+      <div class="card stack">
+        <div><span class="pill ${t.strength === 'strong' ? 'red' : t.strength === 'moderate' ? 'warn' : ''}">${esc(t.strength)} · ${esc(String(t.kind).replace(/_/g, ' '))}</span></div>
+        <div class="vs">${side(t.earlier_id, 'Then')}${side(t.later_id, 'Now')}</div>
+        <div>${esc(t.explanation)}</div>
+        <div class="banner warn"><b>Check before publishing:</b> ${esc(t.check_before_publishing)}</div>
+      </div>`).join('')}
+    ${(r.timeline || []).length ? `<div class="card"><h3>How their position has moved</h3><table><thead><tr><th style="width:22%">Period</th><th>Position</th><th style="width:18%">Based on</th></tr></thead><tbody>
+      ${r.timeline.map(t => `<tr><td>${esc(t.period)}</td><td>${esc(t.position)}</td><td>${(t.statement_ids || []).map(id => { const s = byId.get(id); return s ? `<a href="${esc(safeUrl(s.source_url) || '#')}" target="_blank" rel="noopener">${fmtDate(s.said_on)}</a>` : ''; }).join(', ')}</td></tr>`).join('')}
+    </tbody></table></div>` : ''}`;
+}
+
+async function tabVotes(p) {
+  const el = $('#ptab');
+  const { data, error } = await sb.from('gf_policy_positions').select('*').eq('person_id', p.id).eq('voted', true).order('agreement', { ascending:false });
+  if (error) return toast(error.message, true);
+  if (!data.length) { el.innerHTML = `<div class="empty">${p.jurisdiction === 'federal' ? 'No voting records synced yet.' : 'Voting records are only synced for federal parliament so far.'}</div>`; return; }
+  el.innerHTML = `<div class="card"><input id="vq" placeholder="Filter policies, e.g. climate, housing" style="margin-bottom:.8rem">
+    <table><thead><tr><th>Policy</th><th style="width:34%">Voted for it</th></tr></thead><tbody id="vt"></tbody></table>
+    <p class="hint" style="margin-top:.8rem">Scores from They Vote For You: how often they voted in line with each policy across the divisions it covers.</p></div>`;
+  const draw = () => {
+    const q = $('#vq').value.toLowerCase();
+    $('#vt').innerHTML = data.filter(v => !q || (v.policy_name + ' ' + (v.policy_description || '')).toLowerCase().includes(q)).map(v => `
+      <tr><td><a href="https://theyvoteforyou.org.au/policies/${encodeURIComponent(v.tvfy_policy_id)}" target="_blank" rel="noopener" style="color:var(--ink);font-weight:600">${esc(v.policy_name)}</a>
+      ${v.policy_description ? `<div class="meta">${esc(v.policy_description)}</div>` : ''}</td>
+      <td><div class="row" style="align-items:center;gap:.5rem"><div class="bar" style="flex:1"><i style="width:${Math.max(0, Math.min(100, v.agreement || 0))}%"></i></div><div class="shrink k">${Math.round(v.agreement || 0)}%</div></div></td></tr>`).join('');
+  };
+  $('#vq').oninput = draw; draw();
+}
+
+async function tabMoney(p) {
+  const el = $('#ptab'); el.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+  const [{ data: linked }, { data: fuzzy }] = await Promise.all([
+    sb.from('gf_donations').select('*').eq('person_id', p.id).order('amount', { ascending:false }).limit(300),
+    p.last_name ? sb.from('gf_donations').select('*').is('person_id', null).ilike('recipient_name', `%${p.last_name}%`).order('amount', { ascending:false }).limit(100) : Promise.resolve({ data: [] }),
+  ]);
+  const fz = (fuzzy || []).filter(d => !p.first_name || d.recipient_name.toLowerCase().includes(p.first_name.split(' ')[0].toLowerCase()));
+  const tbl = (rows, linkable) => `<table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th>Type</th><th class="num">Amount</th>${linkable ? '<th></th>' : ''}</tr></thead><tbody>
+    ${rows.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${esc(d.period || fmtDate(d.received_on))}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="num">${money(d.amount)}</td>${linkable ? `<td><button class="linkish" data-link="${d.id}">This is them</button></td>` : ''}</tr>`).join('')}</tbody></table>`;
+  const total = (linked || []).reduce((a, d) => a + Number(d.amount || 0), 0);
+  el.innerHTML = `
+    <div class="card stack"><h3>Linked to ${esc(p.full_name)} ${linked?.length ? `<span class="meta">· ${money(total)} across ${linked.length} records</span>` : ''}</h3>
+      ${linked?.length ? tbl(linked) : '<div class="meta">Nothing linked yet. Import AEC data in Money, then link matches below.</div>'}</div>
+    ${fz.length ? `<div class="card stack" style="margin-top:.8rem"><h3>Possible matches by name</h3><div class="hint">Recipient names that look like this person. Confirm before linking.</div>${tbl(fz, true)}</div>` : ''}`;
+  $$('[data-link]', el).forEach(b => b.onclick = async () => {
+    const { error } = await sb.rpc('gf_link_donation', { p_donation: b.dataset.link, p_person: p.id });
+    error ? toast(error.message, true) : (toast('Linked'), tabMoney(p));
+  });
+}
+
+async function tabInterests(p) {
+  const el = $('#ptab');
+  const { data } = await sb.from('gf_interests').select('*').eq('person_id', p.id).order('declared_on', { ascending:false, nullsFirst:false });
+  el.innerHTML = `
+    <div class="card stack">
+      <h3>Declared interests</h3>
+      <div class="hint">Enter items from the relevant parliament's or council's register of interests. Always link to the register page you read.</div>
+      ${(data || []).length ? `<table><thead><tr><th>Type</th><th>Detail</th><th>Declared</th><th></th></tr></thead><tbody>${data.map(i => `<tr><td><span class="pill">${esc(i.category)}</span></td><td>${esc(i.detail)}${safeUrl(i.source_url) ? ` <a href="${esc(safeUrl(i.source_url))}" target="_blank" rel="noopener">↗</a>` : ''}</td><td>${fmtDate(i.declared_on)}</td><td>${i.added_by === me.id ? `<button class="linkish" data-del="${i.id}" style="color:var(--muted)">Delete</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">None entered yet.</div>'}
+      <form id="if" class="stack" style="border-top:1px solid var(--line);padding-top:.8rem">
+        <div class="row">
+          <div><label>Type</label><select name="category">${['shareholding','property','directorship','trust','gift','travel','liability','membership','other'].map(c => `<option>${c}</option>`).join('')}</select></div>
+          <div><label>Date declared</label><input type="date" name="declared_on"></div>
+        </div>
+        <div><label>Detail</label><input name="detail" required placeholder="e.g. Investment property, Toowoomba (with spouse)"></div>
+        <div><label>Register link</label><input name="source_url" type="url" required placeholder="https://"></div>
+        <div><button class="btn">Add interest</button></div>
+      </form>
+    </div>`;
+  $('#if').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    const { error } = await sb.from('gf_interests').insert({ ...fd, declared_on: fd.declared_on || null, source_url: safeUrl(fd.source_url) || null, person_id: p.id, added_by: me.id });
+    error ? toast(error.message, true) : (toast('Added'), tabInterests(p));
+  };
+  $$('[data-del]', el).forEach(b => b.onclick = async () => { if (!confirm('Delete this interest?')) return; const { error } = await sb.from('gf_interests').delete().eq('id', b.dataset.del); error ? toast(error.message, true) : tabInterests(p); });
+}
+
+/* ─────────── Search ─────────── */
+function viewSearch() {
+  $('#view').innerHTML = `
+  <h1>Search the record</h1>
+  <form id="sf" class="card row">
+    <div style="flex:3"><label for="sq">Words or phrase</label><input id="sq" required placeholder='e.g. "nuclear" or "gas reservation" -export'></div>
+    <div class="shrink"><button class="btn" type="submit">Search</button></div>
+  </form>
+  <div class="hint" style="margin:.4rem 0 1rem">Searches everything on file. Use quotes for exact phrases, a minus sign to exclude a word, "or" for either.</div>
+  <div class="subtabs"><button data-s="file" class="on">On file</button><button data-s="live">Live federal Hansard</button></div>
+  <div id="sres" class="stack"><div class="empty">Search for something to start.</div></div>`;
+  let mode = 'file';
+  $$('.subtabs button').forEach(b => b.onclick = () => { mode = b.dataset.s; $$('.subtabs button').forEach(x => x.classList.toggle('on', x === b)); if ($('#sq').value.trim()) run(); });
+  const run = async () => {
+    const q = $('#sq').value.trim(); if (!q) return;
+    $('#sres').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+    if (mode === 'file') {
+      const { data, error } = await sb.rpc('gf_search_statements', { q, p_person: null, max_rows: 100 });
+      if (error) return ($('#sres').innerHTML = `<div class="banner err">${esc(error.message)}</div>`);
+      $('#sres').innerHTML = data.length ? `<div class="meta">${data.length}${data.length === 100 ? '+' : ''} statements</div>` + data.map(s => stmtCard(s, { showPerson:true })).join('') : '<div class="empty">Nothing on file. Try Live federal Hansard, or capture it yourself.</div>';
+      wireStmtCards($('#sres'));
+    } else {
+      const res = await api(`search-hansard?q=${encodeURIComponent(q)}`);
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) return ($('#sres').innerHTML = `<div class="banner err">${esc(out.error || 'Search failed')}</div>`);
+      if (out.filed) peopleLoaded = false;
+      $('#sres').innerHTML = (out.results || []).length ? `<div class="meta">${out.total ? `${out.total.toLocaleString()} matches in Hansard · ` : ''}showing latest ${out.results.length}${out.filed ? ` · ${out.filed} filed to the record` : ''}</div>` + out.results.map(r => `
+        <div class="stmt"><div class="foot"><span class="k" style="color:var(--ink)">${esc(r.speaker)}</span>${r.party ? `<span>${esc(r.party)}</span>` : ''}<span>${fmtDate(r.date)}</span>${r.debate ? `<span>· ${esc(r.debate)}</span>` : ''}</div>
+        <div class="quote">${esc(r.excerpt)}</div>
+        <div class="foot">${safeUrl(r.url) ? `<a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">Read in Hansard ↗</a>` : ''}${r.person_id ? `<a href="#person/${r.person_id}">Open file</a>` : ''}</div></div>`).join('') : '<div class="empty">No Hansard matches.</div>';
+    }
+  };
+  $('#sf').onsubmit = (e) => { e.preventDefault(); run(); };
+}
+
+/* ─────────── Capture ─────────── */
+function viewCapture(presetId) {
+  const today = new Date().toISOString().slice(0, 10);
+  $('#view').innerHTML = `
+  <h1>Capture a statement</h1>
+  <p class="meta">For anything the system can't collect itself: interviews, socials, radio, podcasts, campaign material, old articles. Screenshot social posts too, in case they're deleted.</p>
+  <form id="capf" class="card stack" autocomplete="off">
+    <div><label for="cp">Who said it</label><input id="cp" list="plistdl" required placeholder="Start typing a name">
+      <datalist id="plistdl">${PEOPLE.map(p => `<option value="${esc(p.full_name)} — ${esc(p.party || '')} ${esc(p.electorate || '')}" data-id="${p.id}">`).join('')}</datalist>
+      <div class="hint">Not listed? <a href="#people" id="addfromcap">Add them first</a>.</div></div>
+    <div class="row">
+      <div><label for="cd">Date said</label><input id="cd" type="date" max="${today}" required></div>
+      <div><label for="cs">Source type</label><select id="cs">${Object.entries(SOURCE_LABEL).filter(([k]) => k !== 'hansard').map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+    </div>
+    <div><label for="cu">Link</label><input id="cu" type="url" placeholder="https:// — archived link (Wayback) is best"></div>
+    <div><label for="cti">Source name</label><input id="cti" placeholder="e.g. 2GB Breakfast, Facebook post, The Australian"></div>
+    <div><label for="cq">Exact words</label><textarea id="cq" required placeholder="Paste or transcribe exactly. Mark gaps with […]"></textarea></div>
+    <div><label for="cc">Context <span class="hint">(what prompted it, who they were responding to, anything that changes the meaning)</span></label><textarea id="cc" style="min-height:70px"></textarea></div>
+    <div><label for="cto">Topics <span class="hint">(comma separated)</span></label><input id="cto" placeholder="housing, negative gearing"></div>
+    <div id="cerr"></div>
+    <div><button class="btn red" type="submit">File it</button></div>
+  </form>`;
+  if (presetId) { const p = PEOPLE.find(x => x.id === presetId); if (p) $('#cp').value = `${p.full_name} — ${p.party || ''} ${p.electorate || ''}`; }
+  if (window.__prefill) {
+    const f = window.__prefill; window.__prefill = null;
+    if (f.url) $('#cu').value = f.url; if (f.title) $('#cti').value = f.title; if (f.date) $('#cd').value = f.date;
+    if (f.type && $(`#cs option[value="${f.type}"]`)) $('#cs').value = f.type;
+  }
+  $('#addfromcap').onclick = (e) => { e.preventDefault(); personDialog(); };
+  $('#capf').onsubmit = async (e) => {
+    e.preventDefault();
+    const label = $('#cp').value.trim();
+    const opt = $$('#plistdl option').find(o => o.value === label);
+    const person = opt ? PEOPLE.find(p => p.id === opt.dataset.id) : PEOPLE.find(p => p.full_name.toLowerCase() === label.toLowerCase());
+    const url = $('#cu').value.trim(), title = $('#cti').value.trim(), quote = $('#cq').value.trim();
+    const err = (m) => $('#cerr').innerHTML = `<div class="banner err">${esc(m)}</div>`;
+    if (!person) return err('Pick the person from the list (or add them first).');
+    if (!url && !title) return err('Add a link or at least a source name, so others can find the original.');
+    if (url && !safeUrl(url)) return err('That link doesn\'t look right.');
+    if (quote.length < 10) return err('Add the exact words.');
+    const { data: dupes } = await sb.from('gf_statements').select('id').eq('person_id', person.id).ilike('quote', `${quote.slice(0, 60).replace(/[%_]/g, '')}%`).limit(1);
+    if (dupes?.length && !confirm('Something very similar is already on file for this person. File anyway?')) return;
+    const { error } = await sb.from('gf_statements').insert({
+      person_id: person.id, said_on: $('#cd').value || null, source_type: $('#cs').value,
+      source_url: safeUrl(url) || null, source_title: title || null, quote, context: $('#cc').value.trim() || null,
+      topics: $('#cto').value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean), added_by: me.id,
+    });
+    if (error) return err(error.message);
+    toast('Filed to the record'); location.hash = `#person/${person.id}`; personTab = 'timeline';
+  };
+}
+
+/* ─────────── Money ─────────── */
+function parseCSV(text) {
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f.length || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+const COLS = {
+  recipient_name: ['recipient name','recipient','name of recipient','party name','candidate name'],
+  donor_name: ['received from','donor name','donor','name of donor','donor/payer name'],
+  amount: ['value','amount','total','amount ($)','value ($)'],
+  period: ['financial year','year','disclosure period','calendar year'],
+  return_type: ['return type'],
+  receipt_type: ['receipt type','gift type','type'],
+  received_on: ['date','date received','date of gift','transaction date'],
+};
+function mapHeader(h) {
+  const n = h.map(x => x.trim().toLowerCase().replace(/^﻿/, ''));
+  const m = {}; for (const [k, al] of Object.entries(COLS)) { const i = n.findIndex(x => al.includes(x)); if (i !== -1) m[k] = i; }
+  return m;
+}
+function parseDate(s) {
+  s = (s || '').trim(); if (!s) return null;
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[0] : null;
+}
+async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+
+function viewMoney() {
+  $('#view').innerHTML = `
+  <h1>Money</h1>
+  <div class="card stack">
+    <h3>Search donations</h3>
+    <form id="mf" class="row"><div style="flex:3"><input id="mq" placeholder="Donor or recipient, e.g. Woodside, Liberal Party (NSW)"></div><div class="shrink"><button class="btn">Search</button></div></form>
+    <div id="mres"></div>
+  </div>
+  <div class="card stack" style="margin-top:1rem">
+    <h3>Import from the AEC Transparency Register</h3>
+    <div class="hint">On transparency.aec.gov.au, filter the data you want (e.g. Donations made, or Detailed receipts for a party or candidate), use Export to CSV, then drop the file here. State electoral commission exports work too if the columns are similar. Duplicate rows are skipped automatically.</div>
+    <input type="file" id="mfile" accept=".csv,text/csv">
+    <div id="mprev"></div>
+  </div>`;
+  $('#mf').onsubmit = async (e) => {
+    e.preventDefault();
+    const q = $('#mq').value.trim().replace(/[%_,()]/g, ' '); if (!q) return;
+    $('#mres').innerHTML = '<span class="spinner"></span>';
+    const { data, error } = await sb.from('gf_donations').select('*').or(`donor_name.ilike.%${q}%,recipient_name.ilike.%${q}%`).order('amount', { ascending:false }).limit(200);
+    if (error) return ($('#mres').innerHTML = `<div class="banner err">${esc(error.message)}</div>`);
+    const total = data.reduce((a, d) => a + Number(d.amount || 0), 0);
+    $('#mres').innerHTML = data.length ? `<div class="meta">${data.length}${data.length === 200 ? '+' : ''} records · ${money(total)}</div><table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th>Type</th><th class="num">Amount</th></tr></thead><tbody>
+      ${data.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${d.person_id ? `<a href="#person/${d.person_id}">${esc(d.recipient_name)}</a>` : esc(d.recipient_name)}</td><td>${esc(d.period || fmtDate(d.received_on))}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No matches.</div>';
+  };
+  $('#mfile').onchange = async (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const rows = parseCSV(await file.text());
+    if (rows.length < 2) return ($('#mprev').innerHTML = '<div class="banner err">That file looks empty.</div>');
+    const m = mapHeader(rows[0]);
+    if (m.recipient_name == null || m.donor_name == null || m.amount == null) return ($('#mprev').innerHTML = `<div class="banner err">Couldn't find recipient, donor and amount columns. Headers found: ${esc(rows[0].join(', '))}</div>`);
+    const byName = new Map(PEOPLE.map(p => [p.full_name.toLowerCase().replace(/[^a-z ]/g, '').trim(), p.id]));
+    const recs = rows.slice(1).map(r => {
+      const get = k => m[k] != null ? (r[m[k]] || '').trim() : '';
+      const rec = { recipient_name: get('recipient_name'), donor_name: get('donor_name'), amount: Number(get('amount').replace(/[$,\s]/g, '')) || null,
+        period: get('period') || null, return_type: get('return_type') || null, receipt_type: get('receipt_type') || null, received_on: parseDate(get('received_on')), source: 'aec' };
+      const key = rec.recipient_name.toLowerCase().replace(/^(the hon|hon|senator|dr|mr|mrs|ms)\.?\s+/, '').replace(/[^a-z ]/g, '').trim();
+      rec.person_id = byName.get(key) || null;
+      return rec;
+    }).filter(r => r.recipient_name && r.donor_name);
+    $('#mprev').innerHTML = `<div class="banner ok">${recs.length.toLocaleString()} rows ready · ${recs.filter(r => r.person_id).length} matched to people on file.</div>
+      <table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th class="num">Amount</th></tr></thead><tbody>${recs.slice(0, 8).map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${esc(d.period || d.received_on || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table>
+      <button class="btn red" id="mgo">Import ${recs.length.toLocaleString()} rows</button> <span id="mprog" class="meta"></span>`;
+    $('#mgo').onclick = async () => {
+      $('#mgo').disabled = true; let done = 0, skipped = 0;
+      const seen = new Map();
+      for (const r of recs) {
+        const base = [r.recipient_name, r.donor_name, r.amount, r.period, r.return_type, r.receipt_type, r.received_on].join('|').toLowerCase();
+        const n = (seen.get(base) || 0) + 1; seen.set(base, n); // identical rows in one file are kept as separate gifts
+        r.row_hash = await sha(base + '#' + n); r.imported_by = me.id;
+      }
+      for (let i = 0; i < recs.length; i += 500) {
+        const chunk = recs.slice(i, i + 500);
+        const { data, error } = await sb.from('gf_donations').upsert(chunk, { onConflict: 'row_hash', ignoreDuplicates: true }).select('id');
+        if (error) { toast(error.message, true); break; }
+        done += data.length; skipped += chunk.length - data.length;
+        $('#mprog').textContent = `${(i + chunk.length).toLocaleString()} / ${recs.length.toLocaleString()}`;
+      }
+      $('#mprev').innerHTML = `<div class="banner ok">Imported ${done.toLocaleString()} new rows${skipped ? `, skipped ${skipped.toLocaleString()} already on file` : ''}.</div>`;
+    };
+  };
+}
+
+/* ─────────── Watches ─────────── */
+async function viewWatches() {
+  const { data } = await sb.from('gf_watches').select('*').order('created_at', { ascending:false });
+  $('#view').innerHTML = `
+  <h1>Watches</h1>
+  <p class="meta">Get a Slack alert when something new on file mentions a topic: overnight Hansard and anything reporters capture.</p>
+  <form id="wf" class="card row">
+    <div style="flex:2"><label>Topic</label><input name="topic" required placeholder='e.g. nuclear, "housing target"'></div>
+    <div style="flex:2"><label>Person <span class="hint">(optional)</span></label><input name="person" list="wdl" placeholder="Anyone"><datalist id="wdl">${PEOPLE.filter(p => p.status === 'sitting').map(p => `<option value="${esc(p.full_name)}">`).join('')}</datalist></div>
+    <div class="shrink"><button class="btn">Add watch</button></div>
+  </form>
+  <div class="card" style="margin-top:1rem">${(data || []).length ? `<table><thead><tr><th>Topic</th><th>Person</th><th></th></tr></thead><tbody>${data.map(w => `<tr><td class="k">${esc(w.topic)}</td><td>${w.person_id ? `<a href="#person/${w.person_id}">${esc(personName(w.person_id))}</a>` : 'Anyone'}</td><td>${w.created_by === me.id ? `<button class="linkish" data-del="${w.id}">Remove</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No watches yet.</div>'}</div>`;
+  $('#wf').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.target));
+    let person_id = null;
+    if (fd.person.trim()) { const p = PEOPLE.find(x => x.full_name.toLowerCase() === fd.person.trim().toLowerCase()); if (!p) return toast('Pick a person from the list, or leave it blank', true); person_id = p.id; }
+    const { error } = await sb.from('gf_watches').insert({ topic: fd.topic.trim(), person_id });
+    error ? toast(error.message, true) : viewWatches();
+  };
+  $$('[data-del]').forEach(b => b.onclick = async () => { await sb.from('gf_watches').delete().eq('id', b.dataset.del); viewWatches(); });
+}
+
+/* ─────────── Admin ─────────── */
+async function viewAdmin() {
+  const [{ data: logs }, { count: nStmt }, { count: nDon }] = await Promise.all([
+    sb.from('gf_sync_log').select('*').order('ran_at', { ascending:false }).limit(15),
+    sb.from('gf_statements').select('id', { count:'exact', head:true }),
+    sb.from('gf_donations').select('id', { count:'exact', head:true }),
+  ]);
+  const synced = PEOPLE.filter(p => p.jurisdiction === 'federal' && p.status === 'sitting').length;
+  $('#view').innerHTML = `
+  <h1>Admin</h1>
+  <div class="grid" style="margin-bottom:1rem">
+    <div class="card"><div class="meta">People on file</div><h2>${PEOPLE.length.toLocaleString()}</h2><div class="meta">${synced} sitting federal</div></div>
+    <div class="card"><div class="meta">Statements</div><h2>${(nStmt || 0).toLocaleString()}</h2></div>
+    <div class="card"><div class="meta">Donation records</div><h2>${(nDon || 0).toLocaleString()}</h2></div>
+  </div>
+  <div class="card stack">
+    <h3>Run a sync now</h3>
+    <div class="hint">These also run automatically every night. First time: run both member syncs, wait a few minutes, then run federal Hansard a few times (each run files about 60 people's speeches).</div>
+    <div class="row">
+      <div class="shrink"><button class="btn" id="s1">Federal members &amp; votes</button></div>
+      <div class="shrink"><button class="btn" id="s3">State &amp; territory members</button></div>
+      <div class="shrink"><button class="btn ghost" id="s2">Federal Hansard batch</button></div>
+      <div class="shrink"><button class="btn ghost" id="s4">Collect documents (all sources)</button></div>
+    </div>
+  </div>
+  <div class="card stack" style="margin-top:1rem">
+    <div class="row" style="align-items:center"><div><h3 style="margin:0">Sources: state Hansard and council minutes</h3></div><div class="shrink"><button class="btn sm" id="addsrc">+ Add a source</button></div></div>
+    <div class="hint">GFILE reads each document and files who said what (Hansard) or who moved, seconded, voted and declared interests (minutes). NSW Hansard has an official API back to 1991. For other parliaments and councils, paste the page that lists the PDFs.</div>
+    <div id="srcs"></div>
+  </div>
+  <div class="card stack" style="margin-top:1rem">
+    <h3 style="margin:0">Import councillors or candidates</h3>
+    <div class="hint">CSV with columns like <b>name</b> (or first/last), <b>council</b>, <b>ward</b>, <b>party</b>, <b>status</b> (sitting/candidate). For state or federal candidates add <b>jurisdiction</b> (nsw, vic…) and <b>electorate</b>. Electoral commission candidate lists work after a little tidying. Existing people with the same name and council are skipped.</div>
+    <input type="file" id="pfile" accept=".csv,text/csv"><div id="pprev"></div>
+  </div>
+  <details class="card" style="margin-top:1rem"><summary class="k">Wikidata position IDs (only if a state chamber fails to sync)</summary>
+    <div class="hint" style="margin:.5rem 0">If the log says a chamber's position wasn't found, look it up on wikidata.org (e.g. "Member of the Victorian Legislative Council") and paste its Q-number here. Keys: nsw_lower, nsw_upper, vic_lower, vic_upper, qld_lower, wa_lower, wa_upper, sa_lower, sa_upper, tas_lower, tas_upper, act, nt.</div>
+    <textarea id="wdpos" style="min-height:90px;font-family:monospace" placeholder='{"vic_upper": "Q123456"}'></textarea>
+    <button class="btn sm" id="wdsave" style="margin-top:.5rem">Save</button>
+  </details>
+  <div class="card" style="margin-top:1rem"><h3>Recent jobs</h3>
+    ${(logs || []).length ? `<table><thead><tr><th>Job</th><th>When</th><th>Result</th></tr></thead><tbody>${logs.map(l => `<tr><td>${esc(l.job)}</td><td>${new Date(l.ran_at).toLocaleString('en-AU')}</td><td>${l.ok ? '<span class="pill ok">ok</span>' : '<span class="pill red">problem</span>'} <span class="meta">${esc(JSON.stringify(l.detail || {}).slice(0, 220))}</span></td></tr>`).join('')}</tbody></table>` : '<div class="meta">No jobs have run yet.</div>'}
+  </div>`;
+  const kick = async (fn, btn) => { btn.disabled = true; const r = await api(fn, { method:'POST' }); btn.disabled = false; r.ok || r.status === 202 ? toast('Started. Refresh this page in a few minutes.') : toast(`Couldn't start (${r.status})`, true); };
+  $('#s1').onclick = e => kick('sync-people-background', e.target);
+  $('#s2').onclick = e => kick('sync-hansard-background', e.target);
+  $('#s3').onclick = e => kick('sync-state-members-background', e.target);
+  $('#s4').onclick = e => kick('ingest-background', e.target);
+  drawSources();
+  $('#addsrc').onclick = () => sourceDialog();
+  $('#pfile').onchange = importPeople;
+  const { data: wd } = await sb.from('gf_settings').select('value').eq('key', 'wikidata_positions').maybeSingle();
+  if (wd?.value) $('#wdpos').value = JSON.stringify(wd.value, null, 1);
+  $('#wdsave').onclick = async () => {
+    let v; try { v = JSON.parse($('#wdpos').value || '{}'); } catch { return toast('That isn\'t valid JSON', true); }
+    const { error } = await sb.from('gf_settings').upsert({ key: 'wikidata_positions', value: v, updated_at: new Date().toISOString() });
+    error ? toast(error.message, true) : toast('Saved. Run the state sync again.');
+  };
+}
+
+
+const SRC_KIND = { nsw_hansard_api:'NSW Hansard API', listing_page:'Listing page', url_list:'URL list' };
+async function drawSources() {
+  const { data: srcs, error } = await sb.from('gf_sources').select('*').order('created_at');
+  if (error) return toast(error.message, true);
+  if (!srcs.length) { $('#srcs').innerHTML = '<div class="meta">No sources yet. Start with NSW Hansard, then add councils one by one.</div>'; return; }
+  const counts = await Promise.all(srcs.map(async s => {
+    const c = {};
+    for (const st of ['new','parsed','error']) { const { count } = await sb.from('gf_documents').select('id', { count:'exact', head:true }).eq('source_id', s.id).eq('status', st); c[st] = count || 0; }
+    return c;
+  }));
+  $('#srcs').innerHTML = `<table><thead><tr><th>Source</th><th>Documents</th><th>Last run</th><th></th></tr></thead><tbody>${srcs.map((s, i) => `
+    <tr data-src="${s.id}"><td><div class="k">${esc(s.name)}</div><div class="meta">${esc(SRC_KIND[s.kind])} · ${s.doc_type === 'minutes' ? `Minutes · ${esc(s.council || '?')}` : `Hansard · ${esc((s.jurisdiction || '').toUpperCase())}`}${s.enabled ? '' : ' · <b>paused</b>'}</div></td>
+    <td><span class="k">${counts[i].parsed}</span> read · ${counts[i].new} waiting${counts[i].error ? ` · <span style="color:var(--red)">${counts[i].error} failed</span>` : ''}</td>
+    <td>${s.last_run_at ? new Date(s.last_run_at).toLocaleString('en-AU') : '—'}${s.last_result && !s.last_result.ok ? `<div class="meta" style="color:var(--red)">${esc(s.last_result.error || '')}</div>` : s.last_result ? `<div class="meta">${s.last_result.new ?? 0} new found</div>` : ''}</td>
+    <td style="white-space:nowrap"><button class="linkish" data-a="run">Run</button> · <button class="linkish" data-a="docs">Documents</button> · <button class="linkish" data-a="requeue">Re-read</button>${s.created_by === me.id ? ` · <button class="linkish" data-a="toggle">${s.enabled ? 'Pause' : 'Resume'}</button> · <button class="linkish" data-a="del" style="color:var(--muted)">Delete</button>` : ''}</td></tr>
+    <tr class="docrow" data-for="${s.id}" hidden><td colspan="4"></td></tr>`).join('')}</tbody></table>`;
+  $$('[data-src]').forEach(row => {
+    const s = srcs.find(x => x.id === row.dataset.src);
+    $$('[data-a]', row).forEach(b => b.onclick = async () => {
+      const a = b.dataset.a;
+      if (a === 'run') { const r = await api('ingest-background', { method:'POST', body: JSON.stringify({ source_id: s.id }) }); r.ok || r.status === 202 ? toast('Started. Refresh in a few minutes.') : toast(`Couldn't start (${r.status})`, true); }
+      if (a === 'requeue') { const all = confirm('Re-read ALL documents for this source?\n\nOK = all documents, Cancel = only ones with problems or unmatched names'); const { data, error } = await sb.rpc('gf_requeue_documents', { p_source: s.id, p_only_unmatched: !all }); error ? toast(error.message, true) : toast(`${data} documents queued. They'll be re-read on the next run.`); }
+      if (a === 'toggle') { const { error } = await sb.from('gf_sources').update({ enabled: !s.enabled }).eq('id', s.id); error ? toast(error.message, true) : drawSources(); }
+      if (a === 'del') { if (!confirm('Delete this source and everything collected from it?')) return; const { error } = await sb.from('gf_sources').delete().eq('id', s.id); error ? toast(error.message, true) : drawSources(); }
+      if (a === 'docs') {
+        const dr = $(`.docrow[data-for="${s.id}"]`); dr.hidden = !dr.hidden; if (dr.hidden) return;
+        const { data } = await sb.from('gf_documents').select('*').eq('source_id', s.id).order('doc_date', { ascending:false, nullsFirst:false }).limit(60);
+        dr.firstElementChild.innerHTML = (data || []).length ? `<table><tbody>${data.map(d => `<tr><td style="width:14%">${fmtDate(d.doc_date)}</td><td><a href="${esc(safeUrl(d.url))}" target="_blank" rel="noopener">${esc(d.title || d.url.split('/').pop())}</a>${d.error ? `<div class="meta" style="color:${d.status === 'error' ? 'var(--red)' : 'var(--muted)'}">${esc(d.error)}</div>` : ''}</td><td style="width:12%"><span class="pill ${d.status === 'parsed' ? 'ok' : d.status === 'error' ? 'red' : ''}">${esc(d.status)}</span></td><td style="width:14%" class="meta">${d.status === 'parsed' ? `${d.matched ?? 0} filed` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="meta">No documents found yet. Press Run.</div>';
+      }
+    });
+  });
+}
+
+function sourceDialog() {
+  const d = document.createElement('dialog');
+  d.innerHTML = `<form class="card" method="dialog" id="srcf">
+    <h2>Add a source</h2>
+    <label>Type</label>
+    <select name="preset" id="preset">
+      <option value="nsw">NSW Hansard (official API, automatic)</option>
+      <option value="minutes">Council minutes page</option>
+      <option value="hansard">Hansard listing page (other parliaments)</option>
+      <option value="urls">A list of document links</option>
+    </select>
+    <label>Name</label><input name="name" required placeholder="e.g. Northern Beaches Council minutes">
+    <div data-show="minutes"><label>Council <span class="hint">(must match the council name on councillors' files)</span></label><input name="council" list="councildl"><datalist id="councildl">${[...new Set(PEOPLE.map(p => p.council).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div data-show="hansard urls"><label>Parliament</label><select name="jurisdiction">${JURIS.filter(j => j !== 'federal' && j !== 'local').map(j => `<option value="${j}">${j.toUpperCase()}</option>`).join('')}</select>
+      <label>Chamber <span class="hint">(optional: helps match speakers)</span></label><select name="chamber"><option value="">Either</option><option value="lower">Lower house</option><option value="upper">Upper house</option></select></div>
+    <div data-show="minutes hansard"><label>Page that lists the documents</label><input name="url" type="url" placeholder="https://"><div class="hint">For councils on InfoCouncil, use the council's infocouncil.biz home page. Otherwise use the minutes page on the council website.</div>
+      <details style="margin-top:.6rem"><summary class="hint">Advanced</summary>
+        <label>Link must match <span class="hint">(regex; default: "minute" for councils)</span></label><input name="link_pattern">
+        <label>Skip links matching <span class="hint">(regex; default skips agendas and attachments for councils)</span></label><input name="exclude_pattern">
+        <label>Also open sub-pages matching <span class="hint">(regex, e.g. 20\\d\\d for year pages)</span></label><input name="follow_pattern">
+        <label>Only documents from <span class="hint">(date)</span></label><input name="since" type="date">
+      </details></div>
+    <div data-show="nsw"><label>Go back to year</label><input name="since_year" type="number" min="1991" max="${new Date().getFullYear()}" value="2007"><div class="hint">Older years are collected over several nights (about 25 sitting days a run).</div></div>
+    <div data-show="urls"><label>Document links (one per line)</label><textarea name="urls"></textarea><label>Document type</label><select name="url_doc_type"><option value="hansard">Hansard</option><option value="minutes">Council minutes</option></select><label>Council (if minutes)</label><input name="url_council"></div>
+    <div class="row" style="margin-top:1rem"><div class="shrink"><button class="btn" value="save">Add</button></div><div class="shrink"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button></div></div>
+  </form>`;
+  document.body.appendChild(d); d.showModal();
+  const sync = () => { const v = $('#preset', d).value; $$('[data-show]', d).forEach(x => x.hidden = !x.dataset.show.split(' ').includes(v)); };
+  $('#preset', d).onchange = sync; sync();
+  d.addEventListener('close', async () => {
+    if (d.returnValue === 'save') {
+      const f = Object.fromEntries(new FormData($('#srcf', d)));
+      let row;
+      const opt = (k) => f[k] && f[k].trim() ? f[k].trim() : undefined;
+      if (f.preset === 'nsw') row = { name: f.name, kind: 'nsw_hansard_api', doc_type: 'hansard', jurisdiction: 'nsw', config: { since_year: Number(f.since_year) || 2007 } };
+      else if (f.preset === 'minutes') {
+        if (!opt('council') || !safeUrl(f.url)) return (toast('Council and page link are both needed', true), d.remove());
+        row = { name: f.name, kind: 'listing_page', doc_type: 'minutes', jurisdiction: 'local', council: f.council.trim(), config: { url: safeUrl(f.url), link_pattern: opt('link_pattern'), exclude_pattern: opt('exclude_pattern'), follow_pattern: opt('follow_pattern'), since: opt('since') } };
+      } else if (f.preset === 'hansard') {
+        if (!safeUrl(f.url)) return (toast('Page link needed', true), d.remove());
+        row = { name: f.name, kind: 'listing_page', doc_type: 'hansard', jurisdiction: f.jurisdiction, config: { url: safeUrl(f.url), chamber: opt('chamber'), link_pattern: opt('link_pattern'), exclude_pattern: opt('exclude_pattern'), follow_pattern: opt('follow_pattern'), since: opt('since') } };
+      } else {
+        const urls = f.urls.split(/\s+/).map(safeUrl).filter(Boolean);
+        if (!urls.length) return (toast('Add at least one link', true), d.remove());
+        const isMin = f.url_doc_type === 'minutes';
+        row = { name: f.name, kind: 'url_list', doc_type: f.url_doc_type, jurisdiction: isMin ? 'local' : f.jurisdiction, council: isMin ? (f.url_council || '').trim() || null : null, config: { urls, chamber: opt('chamber') } };
+      }
+      for (const k of Object.keys(row.config)) if (row.config[k] === undefined) delete row.config[k];
+      const { data, error } = await sb.from('gf_sources').insert(row).select().single();
+      if (error) toast(error.message, true);
+      else { toast('Added. Collecting now…'); await api('ingest-background', { method:'POST', body: JSON.stringify({ source_id: data.id }) }); drawSources(); }
+    }
+    d.remove();
+  });
+}
+
+async function importPeople(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const rows = parseCSV(await file.text());
+  if (rows.length < 2) return ($('#pprev').innerHTML = '<div class="banner err">That file looks empty.</div>');
+  const h = rows[0].map(x => x.trim().toLowerCase().replace(/^﻿/, ''));
+  const col = (...names) => h.findIndex(x => names.includes(x));
+  const ix = { name: col('name','full name','full_name','candidate','candidate name','councillor'), first: col('first','first name','given name','given names','first_name'), last: col('last','last name','surname','family name','last_name'),
+    council: col('council','lga','local government area','area'), ward: col('ward','division','riding'), party: col('party','group','affiliation','party/group'),
+    status: col('status'), jurisdiction: col('jurisdiction','level','state'), electorate: col('electorate','seat','district') };
+  if (ix.name === -1 && ix.last === -1) return ($('#pprev').innerHTML = `<div class="banner err">Couldn't find a name column. Headers: ${esc(rows[0].join(', '))}</div>`);
+  const titleCase = (s) => s.toLowerCase().replace(/(^|[\s'’-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bMc([a-z])/g, (m, b) => 'Mc' + b.toUpperCase());
+  const existing = new Set(PEOPLE.map(p => `${p.full_name.toLowerCase()}|${(p.council || '').toLowerCase()}`));
+  const out = [];
+  for (const r of rows.slice(1)) {
+    const g = (k) => ix[k] >= 0 ? (r[ix[k]] || '').trim() : '';
+    let full = g('name');
+    if (!full) full = [g('first'), g('last')].filter(Boolean).join(' ');
+    if (/^[A-Z' -]+,\s*[A-Za-z]/.test(full)) { const [l, f] = full.split(/,\s*/); full = `${f} ${l}`; } // "SMITH, Jane"
+    if (!full) continue;
+    if (full === full.toUpperCase()) full = titleCase(full);
+    const parts = full.split(/\s+/);
+    const council = g('council') || null;
+    const juris = (g('jurisdiction') || (council ? 'local' : '')).toLowerCase();
+    const status = /cand/i.test(g('status')) ? 'candidate' : /former|past/i.test(g('status')) ? 'former' : (g('status') ? 'sitting' : (council ? 'sitting' : 'candidate'));
+    const rec = { full_name: full, first_name: parts.slice(0, -1).join(' ') || null, last_name: parts.slice(-1)[0], party: g('party') || null, council, ward: g('ward') || null,
+      jurisdiction: JURIS.includes(juris) ? juris : (council ? 'local' : 'federal'), chamber: council ? 'council' : 'lower', electorate: g('electorate') || null, status, created_by: me.id };
+    const key = `${full.toLowerCase()}|${(council || '').toLowerCase()}`;
+    if (existing.has(key)) continue; existing.add(key);
+    out.push(rec);
+  }
+  $('#pprev').innerHTML = `<div class="banner ok">${out.length} new people ready.</div>
+    <table><thead><tr><th>Name</th><th>Council / seat</th><th>Party</th><th>Status</th></tr></thead><tbody>${out.slice(0, 8).map(p => `<tr><td>${esc(p.full_name)}</td><td>${esc(p.council || p.electorate || '')}${p.ward ? ` · ${esc(p.ward)}` : ''}</td><td>${esc(p.party || '')}</td><td>${esc(p.status)}</td></tr>`).join('')}</tbody></table>
+    ${out.length ? `<button class="btn red" id="pgo">Import ${out.length}</button>` : ''}`;
+  if (out.length) $('#pgo').onclick = async () => {
+    $('#pgo').disabled = true;
+    for (let i = 0; i < out.length; i += 300) {
+      const { error } = await sb.from('gf_people').insert(out.slice(i, i + 300));
+      if (error) { toast(error.message, true); return; }
+    }
+    toast(`Imported ${out.length}`); await loadPeople(true); $('#pprev').innerHTML = `<div class="banner ok">Imported ${out.length}. Re-read any council sources so minutes match them.</div>`;
+  };
+}
+
+/* ─────────── Boot ─────────── */
+async function boot() {
+  if (SUPABASE_URL.includes('YOUR-PROJECT')) { $('#app').innerHTML = '<div class="login card"><h2>Setup needed</h2><p>Add your Supabase URL and anon key at the top of index.html.</p></div>'; return; }
+  const { data } = await sb.auth.getSession();
+  session = data.session; me = session?.user || null;
+  if (!session) return viewLogin();
+  shell(); route();
+}
+sb.auth.onAuthStateChange((_e, s) => { if (!s && session) { session = null; viewLogin(); } });
+boot();
+</script>
+</body>
+</html>
