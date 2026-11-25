@@ -770,7 +770,7 @@ function viewCapture(presetId) {
 }
 
 /* ─────────── Money ─────────── */
-const DON_SRC = { aec_annual_receipts:"Receiver's annual return", aec_annual_donor:"Donor's annual return", aec_annual_donor_received:"Donor's annual return (money in)", aec_annual_thirdparty:"Third party's annual return", aec_election_candidate:"Candidate's election return", aec_election_donor:"Donor's election return", aec_election_donor_received:"Donor's election return (money in)", aec_election_thirdparty:"Third party's election return", aec:'AEC export' };
+const DON_SRC = { nswec:'NSW Electoral Commission', vec:'Victorian Electoral Commission', ecq:'Electoral Commission Queensland', waec:'WA Electoral Commission', ecsa:'Electoral Commission SA', tec:'Tasmanian Electoral Commission', elections_act:'Elections ACT', ntec:'NT Electoral Commission', other:'Other import', aec_annual_receipts:"Receiver's annual return", aec_annual_donor:"Donor's annual return", aec_annual_donor_received:"Donor's annual return (money in)", aec_annual_thirdparty:"Third party's annual return", aec_election_candidate:"Candidate's election return", aec_election_donor:"Donor's election return", aec_election_donor_received:"Donor's election return (money in)", aec_election_thirdparty:"Third party's election return", aec:'AEC export' };
 function parseCSV(text) {
   const rows = []; let row = [], f = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -785,17 +785,24 @@ function parseCSV(text) {
   return rows.filter(r => r.some(x => x.trim() !== ''));
 }
 const COLS = {
-  recipient_name: ['recipient name','recipient','name of recipient','party name','candidate name'],
-  donor_name: ['received from','donor name','donor','name of donor','donor/payer name'],
-  amount: ['value','amount','total','amount ($)','value ($)'],
-  period: ['financial year','year','disclosure period','calendar year'],
-  return_type: ['return type'],
-  receipt_type: ['receipt type','gift type','type'],
-  received_on: ['date','date received','date of gift','transaction date'],
+  recipient_name: ['recipient name','recipient','name of recipient','party name','candidate name','political party','donation recipient','gift recipient','received by','donee','recipient full name','recipient entity','name of recipient entity','political participant','participant name','party/candidate','entity name','name'],
+  recipient_extra: ['recipient last name','recipient surname','recipient family name'],
+  donor_name: ['received from','donor name','donor','name of donor','donor/payer name','gift from','donor full name','donor/lender name','donor first name','donor given name','donor given names','from','lender name','gift from name'],
+  donor_extra: ['donor last name','donor surname','donor family name'],
+  donor_org: ['donor organisation','donor organisation name','donor organization','donor entity','donor company','organisation','organisation name','company name'],
+  amount: ['value','amount','total','amount ($)','value ($)','gift value','donation amount','amount received','donation value','gift amount','amount/value','value of gift','amount of gift','total value','gift value ($)','donation amount ($)'],
+  period: ['financial year','year','disclosure period','calendar year','reporting period','event','election','election event','election name','period'],
+  return_type: ['return type','disclosure type','return','form type'],
+  receipt_type: ['receipt type','gift type','type','donation type','gift or loan','type of gift','category'],
+  received_on: ['date','date received','date of gift','transaction date','gift date','donation date','date of donation','date made','date accepted','date donation made','received date','date gift received'],
 };
+const DON_SOURCES = [['nswec','NSW Electoral Commission'],['vec','Victorian Electoral Commission'],['ecq','Electoral Commission Queensland'],['waec','WA Electoral Commission'],['ecsa','Electoral Commission SA'],['tec','Tasmanian Electoral Commission'],['elections_act','Elections ACT'],['ntec','NT Electoral Commission'],['aec','AEC'],['other','Other']];
 function mapHeader(h) {
   const n = h.map(x => x.trim().toLowerCase().replace(/^﻿/, ''));
-  const m = {}; for (const [k, al] of Object.entries(COLS)) { const i = n.findIndex(x => al.includes(x)); if (i !== -1) m[k] = i; }
+  const m = {}, used = new Set();
+  for (const [k, al] of Object.entries(COLS)) {
+    for (const a of al) { const i = n.indexOf(a); if (i !== -1 && !used.has(i)) { m[k] = i; used.add(i); break; } }
+  }
   return m;
 }
 function parseDate(s) {
@@ -920,9 +927,9 @@ function viewMoney() {
     <div id="mzprev"></div>
   </div>
   <div class="card stack" style="margin-top:1rem">
-    <h3>Import a single CSV</h3>
-    <div class="hint">On transparency.aec.gov.au, filter the data you want (e.g. Donations made, or Detailed receipts for a party or candidate), use Export to CSV, then drop the file here. State electoral commission exports work too if the columns are similar. Duplicate rows are skipped automatically.</div>
-    <input type="file" id="mfile" accept=".csv,text/csv">
+    <h3>Import a state electoral commission CSV (or any donations spreadsheet)</h3>
+    <div class="hint">Export donations as CSV from the state commission's disclosure site, pick who published it, and drop the file in. GFILE guesses which column is which; check the dropdowns before importing. Gifts to MPs and candidates are matched to people on file. Duplicate rows are skipped, so re-importing a newer export is safe.</div>
+    <div class="row"><div><label for="msrc">Published by</label><select id="msrc">${DON_SOURCES.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div><div style="flex:2"><label for="mfile">CSV file</label><input type="file" id="mfile" accept=".csv,text/csv"></div></div>
     <div id="mprev"></div>
   </div>`;
   $('#mf').onsubmit = async (e) => {
@@ -940,38 +947,55 @@ function viewMoney() {
     const file = e.target.files[0]; if (!file) return;
     const rows = parseCSV(await file.text());
     if (rows.length < 2) return ($('#mprev').innerHTML = '<div class="banner err">That file looks empty.</div>');
-    const m = mapHeader(rows[0]);
-    if (m.recipient_name == null || m.donor_name == null || m.amount == null) return ($('#mprev').innerHTML = `<div class="banner err">Couldn't find recipient, donor and amount columns. Headers found: ${esc(rows[0].join(', '))}</div>`);
-    const byName = new Map(PEOPLE.map(p => [p.full_name.toLowerCase().replace(/[^a-z ]/g, '').trim(), p.id]));
-    const recs = rows.slice(1).map(r => {
-      const get = k => m[k] != null ? (r[m[k]] || '').trim() : '';
-      const rec = { recipient_name: get('recipient_name'), donor_name: get('donor_name'), amount: Number(get('amount').replace(/[$,\s]/g, '')) || null,
-        period: get('period') || null, return_type: get('return_type') || null, receipt_type: get('receipt_type') || null, received_on: parseDate(get('received_on')), source: 'aec' };
-      const key = rec.recipient_name.toLowerCase().replace(/^(the hon|hon|senator|dr|mr|mrs|ms)\.?\s+/, '').replace(/[^a-z ]/g, '').trim();
-      rec.person_id = byName.get(key) || null;
-      return rec;
-    }).filter(r => r.recipient_name && r.donor_name);
-    $('#mprev').innerHTML = `<div class="banner ok">${recs.length.toLocaleString()} rows ready · ${recs.filter(r => r.person_id).length} matched to people on file.</div>
-      <table><thead><tr><th>Donor</th><th>Recipient</th><th>Period</th><th class="num">Amount</th></tr></thead><tbody>${recs.slice(0, 8).map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${esc(d.period || d.received_on || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table>
-      <button class="btn red" id="mgo">Import ${recs.length.toLocaleString()} rows</button> <span id="mprog" class="meta"></span>`;
-    $('#mgo').onclick = async () => {
-      $('#mgo').disabled = true; let done = 0, skipped = 0;
-      const seen = new Map();
-      for (const r of recs) {
-        const base = [r.recipient_name, r.donor_name, r.amount, r.period, r.return_type, r.receipt_type, r.received_on].join('|').toLowerCase();
-        const n = (seen.get(base) || 0) + 1; seen.set(base, n); // identical rows in one file are kept as separate gifts
-        r.row_hash = await sha(base + '#' + n); r.imported_by = me.id;
+    const head = rows[0].map(h => h.trim().replace(/^﻿/, ''));
+    const auto = mapHeader(head);
+    const FIELDS = [['donor_name','Donor (who gave)',true],['donor_extra','Donor surname, if in its own column'],['donor_org','Donor organisation, if in its own column'],['recipient_name','Recipient (who received)',true],['recipient_extra','Recipient surname, if in its own column'],['amount','Amount',true],['received_on','Date'],['period','Period / election'],['receipt_type','Type of gift'],['return_type','Return type']];
+    const opts = (sel) => `<option value="">—</option>${head.map((h, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${esc(h)}</option>`).join('')}`;
+    $('#mprev').innerHTML = `<div class="stack" style="margin-top:.6rem"><div class="meta">${(rows.length - 1).toLocaleString()} rows. Check each column, then preview.</div>
+      <div class="grid">${FIELDS.map(([k, l, req]) => `<div><label>${l}${req ? '' : ' <span class="hint">(optional)</span>'}</label><select data-col="${k}">${opts(auto[k])}</select></div>`).join('')}</div>
+      <div><button class="btn" id="mprevbtn">Preview</button></div><div id="mprev2"></div></div>`;
+    $('#mprevbtn').onclick = () => {
+      const m = {}; $$('[data-col]', $('#mprev')).forEach(sel => { if (sel.value !== '') m[sel.dataset.col] = Number(sel.value); });
+      if ((m.donor_name == null && m.donor_org == null) || m.recipient_name == null || m.amount == null) return toast('Pick the donor, recipient and amount columns', true);
+      const people = new Map();
+      for (const p of PEOPLE) {
+        const k = nameKey(`${(p.first_name || p.full_name.split(' ')[0] || '').split(' ')[0]} ${p.last_name || p.full_name.split(' ').pop()}`);
+        people.set(k, people.has(k) ? null : p.id);
       }
-      for (let i = 0; i < recs.length; i += 500) {
-        const chunk = recs.slice(i, i + 500);
-        const { data, error } = await sb.from('gf_donations').upsert(chunk, { onConflict: 'row_hash', ignoreDuplicates: true }).select('id');
-        if (error) { toast(error.message, true); break; }
-        done += data.length; skipped += chunk.length - data.length;
-        $('#mprog').textContent = `${(i + chunk.length).toLocaleString()} / ${recs.length.toLocaleString()}`;
-      }
-      $('#mprev').innerHTML = `<div class="banner ok">Imported ${done.toLocaleString()} new rows${skipped ? `, skipped ${skipped.toLocaleString()} already on file` : ''}.</div>`;
+      const source = $('#msrc').value;
+      const recs = rows.slice(1).map(r => {
+        const get = k => m[k] != null ? (r[m[k]] || '').trim() : '';
+        const join = (a, b) => [get(a), get(b)].filter(Boolean).join(' ');
+        const rec = { recipient_name: join('recipient_name', 'recipient_extra'), donor_name: get('donor_org') || join('donor_name', 'donor_extra'),
+          amount: Number(get('amount').replace(/[$,\s]/g, '')) || null, period: get('period') || null, return_type: get('return_type') || null,
+          receipt_type: get('receipt_type') || null, received_on: parseDate(get('received_on')), source, person_id: null };
+        const nm = aecPersonName(rec.recipient_name);
+        if (nm) rec.person_id = people.get(nameKey(`${nm.first} ${nm.last}`)) || null;
+        return rec;
+      }).filter(r => r.recipient_name && r.donor_name);
+      $('#mprev2').innerHTML = `<div class="banner ok">${recs.length.toLocaleString()} rows ready · ${recs.filter(r => r.person_id).length.toLocaleString()} matched to people on file.</div>
+        <table><thead><tr><th>Donor</th><th>Recipient</th><th>When</th><th class="num">Amount</th></tr></thead><tbody>${recs.slice(0, 8).map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}${d.person_id ? ' <span class="pill ok">matched</span>' : ''}</td><td>${esc(d.received_on || d.period || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table>
+        <button class="btn red" id="mgo">Import ${recs.length.toLocaleString()} rows</button> <span id="mprog" class="meta"></span>`;
+      $('#mgo').onclick = async () => {
+        $('#mgo').disabled = true; let done = 0, skipped = 0;
+        const seen = new Map();
+        for (const r of recs) {
+          const base = [r.source, r.recipient_name, r.donor_name, r.amount, r.period, r.return_type, r.receipt_type, r.received_on].join('|').toLowerCase();
+          const n = (seen.get(base) || 0) + 1; seen.set(base, n); // identical rows in one file are kept as separate gifts
+          r.row_hash = fastHash(base + '#' + n); r.imported_by = me.id;
+        }
+        for (let i = 0; i < recs.length; i += 1000) {
+          const chunk = recs.slice(i, i + 1000);
+          const { data, error } = await sb.from('gf_donations').upsert(chunk, { onConflict: 'row_hash', ignoreDuplicates: true }).select('id');
+          if (error) { toast(error.message, true); break; }
+          done += data.length; skipped += chunk.length - data.length;
+          $('#mprog').textContent = `${(i + chunk.length).toLocaleString()} / ${recs.length.toLocaleString()}`;
+        }
+        $('#mprev').innerHTML = `<div class="banner ok">Imported ${done.toLocaleString()} new rows${skipped ? `, skipped ${skipped.toLocaleString()} already on file` : ''}.</div>`;
+      };
     };
   };
+
 }
 
 /* ─────────── Watches ─────────── */
