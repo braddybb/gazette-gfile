@@ -6,7 +6,7 @@
 // Everything lands in a review queue (gf_leads). Nothing goes on the record until a reporter keeps it.
 import { db, upsert, requireUser, env, log } from '../lib/gfile.mjs';
 import { htmlToText, pdfToText } from '../lib/parse.mjs';
-import { verifyQuote, tweetFromHtml, waybackRaw, waybackView, tsToDate, parseCdx, spread, windowsAround, yearOf } from '../lib/scan.mjs';
+import { verifyQuote, tweetFromHtml, waybackRaw, waybackView, tsToDate, parseCdx, spread, windowsAround, yearOf, skipHost, BLOCKED_FOR_SEARCH, mentionsPerson, attributedQuote, publishedFromHtml, refusedDomains } from '../lib/scan.mjs';
 
 const CAP = Number(process.env.SCAN_DAILY_CAP || 5);
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
@@ -108,7 +108,8 @@ async function webSearchAngle(person, beforeYear, angle, keywords) {
   const system = `You are a researcher on an Australian political accountability desk, doing KFile-style archive research.
 Find pages where this person speaks, writes or is directly quoted${beforeYear ? `, published BEFORE ${beforeYear}` : ''}.
 Your seam for this search: ${angle.brief}${keywords ? `\nFOCUS: the reporter is digging into these topics, so search for the person together with each of them and prioritise pages about them: ${keywords}` : ''}
-Prefer pages where they state positions, opinions, promises, criticisms or claims — the things a reporter could hold them to now. Skip their current official parliament bio and recent news.
+Prefer pages where they state positions, opinions, promises, criticisms or claims — the things a reporter could hold them to now. ${beforeYear ? `Everything must be from BEFORE ${beforeYear}, when they were not yet in office: their earlier career, advocacy, business, lobbying, student and community life, and the people and causes they were tied to.` : ''}
+Skip Wikipedia and other encyclopedias or profile aggregators, their current official parliament bio, and recent news.
 Run many different searches: vary keywords, add topics they would have spoken about, their old roles, towns, organisations and aliases. Make sure it is the same person, not a namesake.
 Include only URLs that appeared in your search results. Never construct or guess a URL.
 When finished, call record_leads with up to 15 of the best pages, oldest first.`;
@@ -117,11 +118,25 @@ When finished, call record_leads with up to 15 of the best pages, oldest first.`
   const searchErrors = new Set();
   let lastStop = null, searches = 0;
   let leads = null;
+  let domains = angle.domains ? [...angle.domains] : null;
   for (let turn = 0; turn < 6 && !leads; turn++) {
-    const res = await claude({
-      model: MODEL, max_tokens: 4000, system, messages,
-      tools: [{ type: SEARCH_TOOL, name: 'web_search', max_uses: Number(process.env.SEARCHES_PER_ANGLE || 6), ...(angle.domains ? { allowed_domains: angle.domains } : {}) }, LEADS_TOOL],
-    });
+    let res;
+    try {
+      res = await claude({
+        model: MODEL, max_tokens: 4000, system, messages,
+        tools: [{ type: SEARCH_TOOL, name: 'web_search', max_uses: Number(process.env.SEARCHES_PER_ANGLE || 6), ...(domains ? { allowed_domains: domains } : { blocked_domains: BLOCKED_FOR_SEARCH }) }, LEADS_TOOL],
+      });
+    } catch (e) {
+      // Sites that block AI crawlers are refused by the search tool. Respect that: drop them and carry on.
+      const refused = refusedDomains(e.message);
+      if (domains && refused.length) {
+        domains = domains.filter(d => !refused.includes(d.toLowerCase()));
+        REFUSED_SITES.push(...refused);
+        if (!domains.length) throw new Error('SKIP: every site in this search blocks AI search');
+        turn--; continue;
+      }
+      throw e;
+    }
     lastStop = res.stop_reason;
     for (const block of res.content || []) {
       if (block.type === 'server_tool_use') searches++;
@@ -159,10 +174,11 @@ async function webSearch(person, beforeYear, summary, keywords) {
   const results = await Promise.all(angles.map(a => webSearchAngle(person, beforeYear, a, keywords).then(r => ({ a, r }), e => ({ a, e }))));
   const failed = results.filter(x => x.e);
   if (failed.length === angles.length) throw new Error(`Web search found nothing — ${failed[0].e.message}`);
-  for (const f of failed) if (!/no results came back/.test(f.e.message)) summary.errors.push(`Web search (${f.a.key}): ${f.e.message}`);
+  for (const f of failed) if (!/no results came back|^SKIP:/.test(f.e.message)) summary.errors.push(`Web search (${f.a.key}): ${f.e.message}`);
+  if (REFUSED_SITES.length) summary.blocked_sites = [...new Set(REFUSED_SITES)].sort();
   summary.searches = angles.map(a => a.key);
   const merged = new Map();
-  for (const { r } of results) for (const l of r || []) if (!merged.has(l.url)) merged.set(l.url, l);
+  for (const { r } of results) for (const l of r || []) if (!merged.has(l.url) && !skipHost(l.url)) merged.set(l.url, l);
   return [...merged.values()].sort((x, y) => String(x.date || '9999').localeCompare(String(y.date || '9999')));
 }
 
@@ -173,9 +189,12 @@ async function readPage(url, year) {
     const buf = Buffer.from(await r.arrayBuffer());
     if (buf.length > 15e6) return null;
     const isPdf = buf.slice(0, 5).toString() === '%PDF-';
-    return isPdf ? await pdfToText(buf) : htmlToText(buf.toString('utf8'));
+    if (isPdf) return await pdfToText(buf);
+    const html = buf.toString('utf8');
+    lastHtml = html;
+    return htmlToText(html);
   };
-  let text = null, archive_url = null;
+  let text = null, archive_url = null, lastHtml = '';
   try { text = await tryFetch(url); } catch (_) {}
   if (!text || text.length < 300) {
     try {
@@ -187,7 +206,15 @@ async function readPage(url, year) {
       }
     } catch (_) {}
   }
-  return { text, archive_url };
+  return { text, archive_url, html: lastHtml };
+}
+
+// Earliest Wayback capture — a page first archived after the cut-off can't have been published before it
+async function firstCaptureYear(url) {
+  try {
+    const rows = await cdx(`url=${encodeURIComponent(url.replace(/^https?:\/\//, ''))}&output=json&fl=timestamp,original&limit=1`, 20000);
+    return rows[0] ? Number(rows[0].timestamp.slice(0, 4)) : null;
+  } catch { return null; }
 }
 
 const QUOTES_TOOL = {
@@ -200,13 +227,14 @@ const QUOTES_TOOL = {
       published: { type: 'string', description: 'Publication or broadcast date shown on the page: YYYY-MM-DD, YYYY-MM or YYYY. Empty if not shown.' },
       outlet: { type: 'string' },
       summary: { type: 'string', description: 'One sentence on what they say or do here.' },
-      quotes: { type: 'array', items: { type: 'string' }, description: 'Up to 6 passages spoken or written by this person, copied EXACTLY character for character from the text. Not paraphrased. Not words said about them by others. Choose statements of position, opinion, promise, criticism or factual claim about issues (policy, their electorate, opponents, industries, social questions) — the kind a reporter could compare with what they say now. Skip thanks, greetings, pleasantries, family tributes and procedural lines.' },
+      quotes: { type: 'array', items: { type: 'string' }, description: 'Up to 6 passages spoken or written by this person, copied EXACTLY character for character from the text. Not paraphrased. ONLY words this person said or wrote: text in quotation marks attributed to them, lines under their name in a transcript, or text they authored (op-ed, release, letter). NEVER narrative sentences that describe them (e.g. "Smith vowed to…", "She was elected…"). Choose statements of position, opinion, promise, criticism or factual claim about issues (policy, their electorate, opponents, industries, social questions) — the kind a reporter could compare with what they say now. Skip thanks, greetings, pleasantries, family tributes and procedural lines.' },
     },
     required: ['same_person', 'quotes'],
   },
 };
 
 let SCAN_KEYWORDS = '';
+const REFUSED_SITES = [];
 async function extractQuotes(person, page, lead) {
   const names = [person.full_name, person.last_name, ...(person.aliases || []), ...SCAN_KEYWORDS.split(',').map(k => k.trim()).filter(k => k.length > 3)];
   let excerpt = windowsAround(page, names);
@@ -294,7 +322,7 @@ async function archivedSites(person, beforeYear, summary) {
     if (text.length < 300) return null;
     const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.replace(/\s+/g, ' ').trim() || row.original.replace(/^https?:\/\//, '');
     const q = await extractQuotes(person, text, { title, ownSite: true }).catch(() => null);
-    const verified = (q?.quotes || []).filter(x => verifyQuote(x, text)).slice(0, 6);
+    const verified = (q?.quotes || []).filter(x => verifyQuote(x, text) && attributedQuote(x, text, person, { ownSite: true })).slice(0, 6);
     if (!verified.length) return null;
     const pub = q.published || '';
     return {
@@ -380,18 +408,23 @@ export default async (req) => {
     // Read each web lead and keep only verified quotes
     const checked = await pool(webLeads.slice(0, MAX_PAGES), 6, async (l) => {
       const year = yearOf(l.date);
-      const { text, archive_url } = await readPage(l.url, year || beforeYear);
-      if (!text) return { kind: 'web', url: l.url, archive_url, title: l.title, outlet: l.outlet || null, published_on: /^\d{4}-\d{2}-\d{2}$/.test(l.date || '') ? l.date : null, year, snippet: `${l.why || ''} (Couldn't open the page to check quotes.)`.trim(), quotes: [] };
+      const { text, archive_url, html } = await readPage(l.url, year || beforeYear);
+      if (!text) return { kind: 'web', url: l.url, archive_url, title: l.title, outlet: l.outlet || null, published_on: /^\d{4}-\d{2}-\d{2}$/.test(l.date || '') ? l.date : null, year, snippet: `${l.why || ''} (Couldn't open the page to check quotes. Paywalled or blocked; read it yourself.)`.trim(), quotes: [] };
+      if (!mentionsPerson(text, person)) { summary.wrong_person = (summary.wrong_person || 0) + 1; return null; }
       const q = await extractQuotes(person, text, l);
       if (!q) return null;                    // page never mentions them
-      if (q.same_person === false) return null;
-      const verified = (q.quotes || []).filter(s => verifyQuote(s, text)).slice(0, 6);
+      if (q.same_person === false) { summary.wrong_person = (summary.wrong_person || 0) + 1; return null; }
+      const metaDate = publishedFromHtml(html, l.url);
+      let pageYear = yearOf(metaDate || q.published || l.date);
+      if (beforeYear && !pageYear) { const fc = await firstCaptureYear(l.url); if (fc && fc >= beforeYear) pageYear = fc; }
+      if (beforeYear && pageYear && pageYear >= beforeYear) { summary.too_recent = (summary.too_recent || 0) + 1; return null; }
+      const verified = (q.quotes || []).filter(s => verifyQuote(s, text) && attributedQuote(s, text, person)).slice(0, 6);
       summary.web_dropped += (q.quotes || []).length - verified.length;
       summary.web_verified_quotes += verified.length;
-      const pub = q.published || l.date || '';
+      const pub = metaDate || q.published || l.date || '';
       return {
         kind: 'web', url: l.url, archive_url, title: l.title, outlet: q.outlet || l.outlet || null,
-        published_on: /^\d{4}-\d{2}-\d{2}$/.test(pub) ? pub : null, year: yearOf(pub),
+        published_on: /^\d{4}-\d{2}-\d{2}$/.test(pub) ? pub : null, year: pageYear || yearOf(pub),
         snippet: q.summary || l.why || null, quotes: verified.map(text => ({ text, verified: true })),
       };
     });

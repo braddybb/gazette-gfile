@@ -18,7 +18,7 @@ export default async (req) => {
       try {
         const qid = overrides[pos.key] || pos.qid || await resolveLabel(pos.label);
         if (!qid) { summary.chambers[pos.key] = { error: 'position not found on Wikidata — set its ID in Admin' }; anyFailed = true; continue; }
-        const q = `SELECT ?st ?person ?personLabel ?districtLabel ?partyLabel ?party2Label ?start ?termStart ?image WHERE {
+        const q = `SELECT ?st ?person ?personLabel ?districtLabel ?partyLabel ?party2Label ?start ?termStart ?image ?firstStart WHERE {
           ?person p:P39 ?st . ?st ps:P39 wd:${qid} .
           FILTER NOT EXISTS { ?st pq:P582 [] }
           FILTER NOT EXISTS { ?person wdt:P570 [] }
@@ -28,6 +28,7 @@ export default async (req) => {
           OPTIONAL { ?st pq:P2937 ?term . ?term wdt:P580 ?termStart }
           OPTIONAL { ?person p:P102 ?ps . ?ps ps:P102 ?party2 . FILTER NOT EXISTS { ?ps pq:P582 [] } }
           OPTIONAL { ?person wdt:P18 ?image }
+          OPTIONAL { SELECT ?person (MIN(?s0) AS ?firstStart) WHERE { ?person p:P39 ?x0 . ?x0 ps:P39 wd:${qid} . OPTIONAL { ?x0 pq:P580 ?a0 } OPTIONAL { ?x0 pq:P2937 ?t0 . ?t0 wdt:P580 ?b0 } BIND(COALESCE(?a0, ?b0) AS ?s0) } GROUP BY ?person }
           SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
         }`;
         const r = await fetch(`https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(q)}`, { headers: UA });
@@ -45,6 +46,7 @@ export default async (req) => {
             last_name: parts.slice(-1)[0], jurisdiction: pos.jurisdiction, chamber: pos.chamber, status: 'sitting',
             electorate: m.district, state: pos.jurisdiction.toUpperCase(), party: m.party,
             photo_url: m.image ? `${m.image.replace(/^http:/, 'https:')}?width=240` : null,
+            ...(m.firstStart ? { first_elected: Number(String(m.firstStart).slice(0, 4)) } : {}),
           };
         });
         const saved = await upsert('gf_people', people, 'wikidata_id');

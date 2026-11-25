@@ -71,6 +71,17 @@ export default async (req) => {
       summary.retired = gone.length;
     }
 
+    // 4b. Year first elected (once per person), from OpenAustralia's member history
+    const needYear = await db('gf_people?select=id,oa_person_id,chamber&jurisdiction=eq.federal&status=eq.sitting&first_elected=is.null&oa_person_id=not.is.null&limit=300');
+    let years = 0;
+    await pool(needYear, 4, async (p) => {
+      const d = await oa(p.chamber === 'senate' ? 'getSenator' : 'getRepresentative', { id: p.oa_person_id });
+      const dates = JSON.stringify(d).match(/"entered_(?:house|senate)"\s*:\s*"((?:19|20)\d\d)/g) || [];
+      const ys = dates.map(x => Number(x.match(/(19|20)\d\d/)[0]));
+      if (ys.length) { await db(`gf_people?id=eq.${p.id}`, { method: 'PATCH', body: { first_elected: Math.min(...ys) } }); years++; }
+    });
+    summary.first_elected_filled = years;
+
     // 5. Voting records
     const withTv = saved.filter(r => r.tvfy_id);
     await pool(withTv, 5, async (person) => {
