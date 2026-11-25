@@ -5,16 +5,16 @@ export const POSITIONS = [
   { key: 'nsw_lower', jurisdiction: 'nsw', chamber: 'lower', qid: 'Q19202748', label: 'Member of the New South Wales Legislative Assembly', expected: 93, singleMember: true },
   { key: 'nsw_upper', jurisdiction: 'nsw', chamber: 'upper', qid: 'Q18810377', label: 'Member of the New South Wales Legislative Council', expected: 42 },
   { key: 'vic_lower', jurisdiction: 'vic', chamber: 'lower', qid: 'Q18534408', label: 'Member of the Victorian Legislative Assembly', expected: 88, singleMember: true },
-  { key: 'vic_upper', jurisdiction: 'vic', chamber: 'upper', label: 'Member of the Victorian Legislative Council', expected: 40 },
+  { key: 'vic_upper', jurisdiction: 'vic', chamber: 'upper', qid: 'Q19185341', label: 'Member of the Victorian Legislative Council', expected: 40 },
   { key: 'qld_lower', jurisdiction: 'qld', chamber: 'lower', qid: 'Q18526194', label: 'Member of the Queensland Legislative Assembly', expected: 93, singleMember: true },
   { key: 'wa_lower',  jurisdiction: 'wa',  chamber: 'lower', qid: 'Q20165902', label: 'Member of the Western Australian Legislative Assembly', expected: 59, singleMember: true },
-  { key: 'wa_upper',  jurisdiction: 'wa',  chamber: 'upper', label: 'Member of the Western Australian Legislative Council', expected: 37 },
-  { key: 'sa_lower',  jurisdiction: 'sa',  chamber: 'lower', label: 'Member of the South Australian House of Assembly', expected: 47, singleMember: true },
+  { key: 'wa_upper',  jurisdiction: 'wa',  chamber: 'upper', qid: 'Q19627913', label: 'Member of the Western Australian Legislative Council', expected: 37 },
+  { key: 'sa_lower',  jurisdiction: 'sa',  chamber: 'lower', qid: 'Q18220900', label: 'Member of the South Australian House of Assembly', expected: 47, singleMember: true },
   { key: 'sa_upper',  jurisdiction: 'sa',  chamber: 'upper', qid: 'Q18662245', label: 'Member of the South Australian Legislative Council', expected: 22 },
-  { key: 'tas_lower', jurisdiction: 'tas', chamber: 'lower', label: 'Member of the Tasmanian House of Assembly', expected: 35 },
-  { key: 'tas_upper', jurisdiction: 'tas', chamber: 'upper', label: 'Member of the Tasmanian Legislative Council', expected: 15, singleMember: true },
-  { key: 'act',       jurisdiction: 'act', chamber: 'lower', label: 'Member of the Australian Capital Territory Legislative Assembly', expected: 25 },
-  { key: 'nt',        jurisdiction: 'nt',  chamber: 'lower', label: 'Member of the Northern Territory Legislative Assembly', expected: 25, singleMember: true },
+  { key: 'tas_lower', jurisdiction: 'tas', chamber: 'lower', qid: 'Q19007285', label: 'Member of the Tasmanian House of Assembly', expected: 35 },
+  { key: 'tas_upper', jurisdiction: 'tas', chamber: 'upper', qid: 'Q19299542', label: 'Member of the Tasmanian Legislative Council', expected: 15, singleMember: true },
+  { key: 'act',       jurisdiction: 'act', chamber: 'lower', qid: 'Q6814365', label: 'Member of the Australian Capital Territory Legislative Assembly', expected: 25 },
+  { key: 'nt',        jurisdiction: 'nt',  chamber: 'lower', qid: 'Q26998278', label: 'Member of the Northern Territory Legislative Assembly', expected: 25, singleMember: true },
 ];
 
 export const UA = { 'User-Agent': 'GFILE/1.0 (Gazette newsroom research tool)', Accept: 'application/sparql-results+json' };

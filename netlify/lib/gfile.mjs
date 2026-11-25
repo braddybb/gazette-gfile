@@ -73,11 +73,26 @@ export async function oa(fn, params = {}) {
   const qs = new URLSearchParams({ key: env('OPENAUSTRALIA_KEY'), output: 'js', ...params });
   const res = await fetch(`https://www.openaustralia.org.au/api/${fn}?${qs}`);
   const text = await res.text();
-  if (!res.ok) throw new Error(`OpenAustralia ${fn} → ${res.status}`);
+  if (!res.ok) throw new Error(`OpenAustralia ${fn} → ${res.status}${text ? `: ${text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)}` : ''}`);
   let data;
   try { data = JSON.parse(text); } catch { throw new Error(`OpenAustralia ${fn} returned non-JSON: ${text.slice(0, 200)}`); }
   if (data && data.error) throw new Error(`OpenAustralia ${fn}: ${data.error}`);
   return data;
+}
+
+// One person's speeches. OpenAustralia's person lookup can throw server errors, so fall back
+// to its search syntax (speaker:ID), which reaches the same data a different way.
+export async function oaSpeeches(personId, { num = 50, page = 1 } = {}) {
+  const attempts = [
+    { person: personId, num: String(num), page: String(page) },
+    { search: `speaker:${personId}`, order: 'd', num: String(num), page: String(page) },
+    { person: personId, num: '20', page: String(page) },
+  ];
+  let lastErr;
+  for (const a of attempts) {
+    try { return await oa('getHansard', a); } catch (e) { lastErr = e; if (!/→ 5\d\d/.test(e.message)) break; }
+  }
+  throw lastErr;
 }
 
 // ───────── They Vote For You (federal voting records) ─────────
