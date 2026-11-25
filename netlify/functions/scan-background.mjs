@@ -80,15 +80,21 @@ Include only URLs that appeared in your search results. Never construct or guess
 When finished, call record_leads with up to 25 of the best pages, oldest first.`;
   const messages = [{ role: 'user', content: `${facts}\n\nFind their old media appearances${beforeYear ? ` from before ${beforeYear}` : ''}.` }];
   const seenUrls = new Map();
+  const searchErrors = new Set();
+  let lastStop = null, searches = 0;
   let leads = null;
   for (let turn = 0; turn < 6 && !leads; turn++) {
     const res = await claude({
       model: MODEL, max_tokens: 4000, system, messages,
       tools: [{ type: SEARCH_TOOL, name: 'web_search', max_uses: 12 }, LEADS_TOOL],
     });
+    lastStop = res.stop_reason;
     for (const block of res.content || []) {
+      if (block.type === 'server_tool_use') searches++;
       if (block.type === 'web_search_tool_result' && Array.isArray(block.content)) {
         for (const r of block.content) if (r.url) seenUrls.set(r.url, { title: r.title, page_age: r.page_age });
+      } else if (block.type === 'web_search_tool_result' && block.content?.error_code) {
+        searchErrors.add(block.content.error_code);
       }
       if (block.type === 'tool_use' && block.name === 'record_leads') leads = block.input?.leads || [];
     }
@@ -105,6 +111,12 @@ When finished, call record_leads with up to 25 of the best pages, oldest first.`
   const valid = (leads || [])
     .map(l => ({ ...l, url: seenUrls.has(l.url) ? l.url : seenStripped.get(strip(l.url)) }))
     .filter(l => l.url);
+  if (!seenUrls.size) {
+    const why = searchErrors.size ? `search error: ${[...searchErrors].join(', ')}`
+      : searches === 0 ? 'the AI never ran a search — check web search is enabled for your organisation in the Anthropic Console'
+      : `no results came back (stopped: ${lastStop})`;
+    throw new Error(`Web search found nothing — ${why}`);
+  }
   if (!valid.length) {
     return [...seenUrls.entries()].slice(0, 20).map(([url, m]) => ({ url, title: m.title, why: null, date: m.page_age || null }));
   }
@@ -264,6 +276,9 @@ export default async (req) => {
     const leads = [];
     const tag = (l) => ({ ...l, person_id: person.id, scan_id: scanId });
 
+    if (!process.env.YOUTUBE_API_KEY) summary.errors.push('YouTube skipped (no YOUTUBE_API_KEY set)');
+    if (!process.env.TROVE_API_KEY) summary.errors.push('Trove skipped (no TROVE_API_KEY set)');
+    if (!person.handles?.twitter) summary.notes = 'No Twitter handle in Research details, so archived tweets were skipped.';
     // Run the independent sources side by side
     const [webLeads, tweets, sites, vids, tro] = await Promise.all([
       webSearch(person, beforeYear).catch(e => { summary.errors.push(`Web search: ${e.message}`); return []; }),
@@ -302,7 +317,7 @@ export default async (req) => {
     for (let i = 0; i < rows.length; i += 100) await upsert('gf_leads', rows.slice(i, i + 100), 'person_id,url', { ignore: true });
     summary.total = rows.length;
     await db(`gf_scans?id=eq.${scanId}`, { method: 'PATCH', body: { status: 'done', summary, finished_at: new Date().toISOString() } });
-    await log('scan', summary.errors.length === 0, { person: person.full_name, ...summary });
+    await log('scan', summary.errors.filter(e => !/skipped/.test(e)).length === 0, { person: person.full_name, ...summary });
   } catch (e) {
     await fail(scanId, e.message);
   }
