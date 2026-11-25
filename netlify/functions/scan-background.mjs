@@ -12,7 +12,7 @@ const CAP = Number(process.env.SCAN_DAILY_CAP || 5);
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const QUOTE_MODEL = process.env.QUOTE_MODEL || 'claude-haiku-5-5';
 const SEARCH_TOOL = process.env.WEB_SEARCH_TOOL || 'web_search_20250305';
-const MAX_PAGES = 15;
+const MAX_PAGES = Number(process.env.SCAN_MAX_PAGES || 60);
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; GFILE newsroom research)' };
 
 async function timed(url, ms = 20000, opts = {}) {
@@ -66,7 +66,39 @@ const LEADS_TOOL = {
   },
 };
 
-async function webSearch(person, beforeYear) {
+// Several focused searches run side by side, each digging a different seam, then merged.
+const ANGLES = [
+  { key: 'broadcast', brief: 'RADIO AND TV: transcripts and write-ups of interviews — ABC (AM, PM, The World Today, Lateline, 7.30, Insiders, Q&A, local ABC radio), Sky, commercial and regional radio, podcasts. Transcript pages on abc.net.au, parliament and party sites are gold.' },
+  { key: 'print', brief: 'PRINT: newspaper and magazine articles quoting them, op-eds they wrote and letters to the editor — national papers and especially regional and local papers in the areas they lived and worked. Also archived copies of those articles.' },
+  { key: 'before', brief: 'BEFORE OFFICE: their life before parliament or council — previous jobs and employers (publications, annual reports, submissions to inquiries, evidence to parliamentary committees), industry bodies, unions, think tanks, businesses, community groups, student politics and student newspapers, preselection contests and earlier campaigns.' },
+  { key: 'ownwords', brief: 'THEIR OWN WORDS ONLINE: their old websites, blogs, media releases, e-newsletters, campaign material, conference and event speeches, party publications, and news stories quoting their old social media posts.' },
+  { key: 'about', brief: 'COVERAGE ABOUT THEM: profiles, investigations, controversies, court or tribunal mentions, business dealings, preselection fights and anything written about them where they respond or are quoted.' },
+];
+const PARLIAMENT_DOMAINS = ['aph.gov.au', 'parlinfo.aph.gov.au', 'parliament.nsw.gov.au', 'parliament.vic.gov.au', 'parliament.qld.gov.au', 'parliament.wa.gov.au', 'parliament.sa.gov.au', 'parliament.tas.gov.au', 'parliament.act.gov.au', 'hansard.act.gov.au', 'parliament.nt.gov.au'];
+// Searches locked to specific sites, so the deep archives actually get reached
+const OUTLETS = {
+  national: ['theaustralian.com.au', 'afr.com', 'smh.com.au', 'theage.com.au', 'brisbanetimes.com.au', 'watoday.com.au', 'theguardian.com', 'news.com.au', 'canberratimes.com.au', 'sbs.com.au', 'thesaturdaypaper.com.au', 'themonthly.com.au', 'crikey.com.au', 'theconversation.com', 'insidestory.org.au', 'michaelwest.com.au', 'independentaustralia.net'],
+  tabloid: ['dailytelegraph.com.au', 'heraldsun.com.au', 'couriermail.com.au', 'adelaidenow.com.au', 'perthnow.com.au', 'themercury.com.au', 'ntnews.com.au', 'geelongadvertiser.com.au', 'goldcoastbulletin.com.au', 'townsvillebulletin.com.au', 'cairnspost.com.au', 'weeklytimesnow.com.au', 'thewest.com.au', 'skynews.com.au'],
+  regional: ['standard.net.au', 'thecourier.com.au', 'bendigoadvertiser.com.au', 'theadvocate.com.au', 'examiner.com.au', 'newcastleherald.com.au', 'illawarramercury.com.au', 'dailyadvertiser.com.au', 'bordermail.com.au', 'northerndailyleader.com.au', 'portnews.com.au', 'centralwesterndaily.com.au', 'westernadvocate.com.au', 'dailyliberal.com.au', 'theland.com.au', 'queenslandcountrylife.com.au', 'stockandland.com.au', 'farmweekly.com.au'],
+  broadcast: ['2gb.com', '3aw.com.au', '4bc.com.au', '6pr.com.au', '9news.com.au', '7news.com.au', 'skynews.com.au', 'sbs.com.au', 'abc.net.au', 'nine.com.au', '10play.com.au', 'triplej.net.au'],
+};
+
+function domainAngles(person) {
+  const out = [
+    { key: 'national papers', domains: OUTLETS.national, brief: 'NATIONAL AND INDEPENDENT MEDIA ONLY: articles quoting them, interviews, op-eds and letters they wrote, profiles and investigations.' },
+    { key: 'metro tabloids', domains: OUTLETS.tabloid, brief: 'NEWS CORP AND METRO PAPERS ONLY: articles quoting them, op-eds, interviews and profiles, especially state and local coverage.' },
+    { key: 'regional papers', domains: OUTLETS.regional, brief: 'REGIONAL AND RURAL PAPERS ONLY: local coverage quoting them, columns they wrote, letters, community events, candidacy and preselection coverage.' },
+    { key: 'radio & TV', domains: OUTLETS.broadcast, brief: 'RADIO AND TV SITES ONLY: interview transcripts, audio and video pages, and write-ups of interviews they gave.' },
+    { key: 'parliament', domains: PARLIAMENT_DOMAINS, brief: 'PARLIAMENT ARCHIVES ONLY: their press releases, radio and TV interview transcripts, and media statements held in the Parliamentary Library (ParlInfo media collection), plus committee hearing evidence they gave or questions they asked, and older Hansard.' },
+    { key: 'abc', domains: ['abc.net.au'], brief: 'ABC ONLY: transcripts and stories where they are interviewed or quoted — AM, PM, The World Today, Lateline, 7.30, Insiders, Q&A, Four Corners, RN programs and ABC local radio and regional news.' },
+    { key: 'gov', domains: ['gov.au'], brief: 'GOVERNMENT SITES ONLY: ministerial and shadow-ministerial media releases and transcripts, submissions they wrote or signed to inquiries, council minutes or reports naming them, and annual reports of bodies they led.' },
+  ];
+  const own = [...new Set((person.old_urls || []).map(u => { try { return new URL(/^https?:/.test(u) ? u : `https://${u}`).hostname.replace(/^www\./, ''); } catch { return null; } }).filter(Boolean))];
+  if (own.length) out.push({ key: 'own sites', domains: own.slice(0, 5), brief: 'THEIR OWN WEBSITES ONLY: media releases, speeches, newsletters, columns, blog posts and policy pages.' });
+  return out;
+}
+
+async function webSearchAngle(person, beforeYear, angle, keywords) {
   const aliases = (person.aliases || []).filter(Boolean);
   const facts = [
     `Name: ${person.full_name}${aliases.length ? ` (also known as: ${aliases.join(', ')})` : ''}`,
@@ -74,11 +106,13 @@ async function webSearch(person, beforeYear) {
     person.notes ? `Background notes from our reporters: ${person.notes}` : null,
   ].filter(Boolean).join('\n');
   const system = `You are a researcher on an Australian political accountability desk, doing KFile-style archive research.
-Find pages where this person speaks or is quoted${beforeYear ? `, published BEFORE ${beforeYear}` : ''}: radio and TV transcripts (ABC AM, PM, Lateline, 7.30, Q&A, local radio), interviews, op-eds they wrote, letters to the editor, profiles, student newspaper pieces, think-tank or union publications, old council or business roles, podcasts, forum or debate write-ups.
-Search widely and creatively: use their aliases, earlier jobs, hometown and old roles. Make sure it is the same person, not a namesake.
+Find pages where this person speaks, writes or is directly quoted${beforeYear ? `, published BEFORE ${beforeYear}` : ''}.
+Your seam for this search: ${angle.brief}${keywords ? `\nFOCUS: the reporter is digging into these topics, so search for the person together with each of them and prioritise pages about them: ${keywords}` : ''}
+Prefer pages where they state positions, opinions, promises, criticisms or claims — the things a reporter could hold them to now. Skip their current official parliament bio and recent news.
+Run many different searches: vary keywords, add topics they would have spoken about, their old roles, towns, organisations and aliases. Make sure it is the same person, not a namesake.
 Include only URLs that appeared in your search results. Never construct or guess a URL.
-When finished, call record_leads with up to 25 of the best pages, oldest first.`;
-  const messages = [{ role: 'user', content: `${facts}\n\nFind their old media appearances${beforeYear ? ` from before ${beforeYear}` : ''}.` }];
+When finished, call record_leads with up to 15 of the best pages, oldest first.`;
+  const messages = [{ role: 'user', content: `${facts}\n\nFind their old ${angle.key === 'before' ? 'pre-politics record' : 'media appearances'}${beforeYear ? ` from before ${beforeYear}` : ''}.` }];
   const seenUrls = new Map();
   const searchErrors = new Set();
   let lastStop = null, searches = 0;
@@ -86,7 +120,7 @@ When finished, call record_leads with up to 25 of the best pages, oldest first.`
   for (let turn = 0; turn < 6 && !leads; turn++) {
     const res = await claude({
       model: MODEL, max_tokens: 4000, system, messages,
-      tools: [{ type: SEARCH_TOOL, name: 'web_search', max_uses: 12 }, LEADS_TOOL],
+      tools: [{ type: SEARCH_TOOL, name: 'web_search', max_uses: Number(process.env.SEARCHES_PER_ANGLE || 6), ...(angle.domains ? { allowed_domains: angle.domains } : {}) }, LEADS_TOOL],
     });
     lastStop = res.stop_reason;
     for (const block of res.content || []) {
@@ -107,7 +141,6 @@ When finished, call record_leads with up to 25 of the best pages, oldest first.`
   }
   const strip = (u) => String(u || '').replace(/[#?].*$/, '').replace(/\/$/, '');
   const seenStripped = new Map([...seenUrls.keys()].map(u => [strip(u), u]));
-  // Only keep URLs that really came back from search
   const valid = (leads || [])
     .map(l => ({ ...l, url: seenUrls.has(l.url) ? l.url : seenStripped.get(strip(l.url)) }))
     .filter(l => l.url);
@@ -115,12 +148,22 @@ When finished, call record_leads with up to 25 of the best pages, oldest first.`
     const why = searchErrors.size ? `search error: ${[...searchErrors].join(', ')}`
       : searches === 0 ? 'the AI never ran a search — check web search is enabled for your organisation in the Anthropic Console'
       : `no results came back (stopped: ${lastStop})`;
-    throw new Error(`Web search found nothing — ${why}`);
+    throw new Error(why);
   }
-  if (!valid.length) {
-    return [...seenUrls.entries()].slice(0, 20).map(([url, m]) => ({ url, title: m.title, why: null, date: m.page_age || null }));
-  }
+  if (!valid.length) return [...seenUrls.entries()].slice(0, 10).map(([url, m]) => ({ url, title: m.title, why: null, date: m.page_age || null }));
   return valid;
+}
+
+async function webSearch(person, beforeYear, summary, keywords) {
+  const angles = [...ANGLES, ...domainAngles(person)];
+  const results = await Promise.all(angles.map(a => webSearchAngle(person, beforeYear, a, keywords).then(r => ({ a, r }), e => ({ a, e }))));
+  const failed = results.filter(x => x.e);
+  if (failed.length === angles.length) throw new Error(`Web search found nothing — ${failed[0].e.message}`);
+  for (const f of failed) if (!/no results came back/.test(f.e.message)) summary.errors.push(`Web search (${f.a.key}): ${f.e.message}`);
+  summary.searches = angles.map(a => a.key);
+  const merged = new Map();
+  for (const { r } of results) for (const l of r || []) if (!merged.has(l.url)) merged.set(l.url, l);
+  return [...merged.values()].sort((x, y) => String(x.date || '9999').localeCompare(String(y.date || '9999')));
 }
 
 async function readPage(url, year) {
@@ -157,21 +200,23 @@ const QUOTES_TOOL = {
       published: { type: 'string', description: 'Publication or broadcast date shown on the page: YYYY-MM-DD, YYYY-MM or YYYY. Empty if not shown.' },
       outlet: { type: 'string' },
       summary: { type: 'string', description: 'One sentence on what they say or do here.' },
-      quotes: { type: 'array', items: { type: 'string' }, description: 'Up to 5 passages spoken or written by this person, copied EXACTLY character for character from the text. Not paraphrased. Not words said about them by others.' },
+      quotes: { type: 'array', items: { type: 'string' }, description: 'Up to 6 passages spoken or written by this person, copied EXACTLY character for character from the text. Not paraphrased. Not words said about them by others. Choose statements of position, opinion, promise, criticism or factual claim about issues (policy, their electorate, opponents, industries, social questions) — the kind a reporter could compare with what they say now. Skip thanks, greetings, pleasantries, family tributes and procedural lines.' },
     },
     required: ['same_person', 'quotes'],
   },
 };
 
+let SCAN_KEYWORDS = '';
 async function extractQuotes(person, page, lead) {
-  const names = [person.full_name, person.last_name, ...(person.aliases || [])];
-  const excerpt = windowsAround(page, names);
+  const names = [person.full_name, person.last_name, ...(person.aliases || []), ...SCAN_KEYWORDS.split(',').map(k => k.trim()).filter(k => k.length > 3)];
+  let excerpt = windowsAround(page, names);
+  if (!excerpt && lead.ownSite) excerpt = page.slice(0, 10000);
   if (!excerpt) return null; // page doesn't mention them
   const res = await claude({
     model: QUOTE_MODEL, max_tokens: 1500,
     system: 'You extract verbatim quotes for journalists. Copy text exactly; never paraphrase, tidy or merge sentences. If unsure it is the same person, say so.',
     tools: [QUOTES_TOOL], tool_choice: { type: 'tool', name: 'record_quotes' },
-    messages: [{ role: 'user', content: `PERSON: ${person.full_name} (${[person.party, person.electorate].filter(Boolean).join(', ')})${person.notes ? `\nBackground: ${person.notes.slice(0, 500)}` : ''}\nPAGE TITLE: ${lead.title || ''}\n\nPAGE TEXT (excerpts):\n${excerpt}` }],
+    messages: [{ role: 'user', content: `${SCAN_KEYWORDS ? `PRIORITY TOPICS (choose quotes about these first): ${SCAN_KEYWORDS}\n` : ''}PERSON: ${person.full_name} (${[person.party, person.electorate].filter(Boolean).join(', ')})${person.notes ? `\nBackground: ${person.notes.slice(0, 500)}` : ''}\nPAGE TITLE: ${lead.title || ''}\n\nPAGE TEXT (excerpts):\n${excerpt}` }],
   });
   const call = (res.content || []).find(c => c.type === 'tool_use');
   return call ? call.input : null;
@@ -182,12 +227,10 @@ async function archivedTweets(handle, beforeYear) {
   const h = String(handle).replace(/^@/, '').replace(/^https?:\/\/(www\.)?(twitter|x)\.com\//i, '').split(/[/?]/)[0];
   if (!/^[A-Za-z0-9_]{1,15}$/.test(h)) return [];
   const to = beforeYear ? `&to=${beforeYear - 1}1231` : '';
-  const r = await timed(`https://web.archive.org/cdx/search/cdx?url=twitter.com/${h}/status/*&output=json&fl=timestamp,original&filter=statuscode:200&collapse=urlkey&limit=2000${to}`, 30000);
-  if (!r.ok) return [];
-  const rows = parseCdx(await r.json()).filter(x => /\/status(es)?\/\d+/.test(x.original));
-  const pick = spread(rows, 40);
+  const rows = (await cdx(`url=twitter.com/${h}/status/*&output=json&fl=timestamp,original&filter=statuscode:200&collapse=urlkey&limit=1500${to}`)).filter(x => /\/status(es)?\/\d+/.test(x.original));
+  const pick = spread(rows, 60);
   const got = await pool(pick, 4, async (row) => {
-    const res = await timed(waybackRaw(row.timestamp, row.original), 20000);
+    const res = await timed(waybackRaw(row.timestamp, row.original), 45000);
     if (!res.ok) return null;
     const tw = tweetFromHtml(await res.text());
     if (!tw) return null;
@@ -203,20 +246,65 @@ async function archivedTweets(handle, beforeYear) {
   return got.filter(Boolean);
 }
 
-async function archivedSites(urls, beforeYear) {
-  const out = [];
-  for (const u of urls.slice(0, 5)) {
-    const to = beforeYear ? `&to=${beforeYear - 1}1231` : '';
-    const r = await timed(`https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(u)}&output=json&fl=timestamp,original&filter=statuscode:200&collapse=timestamp:4&limit=30${to}`, 30000);
-    if (!r.ok) continue;
-    for (const row of parseCdx(await r.json()).slice(0, 12)) {
-      out.push({
-        kind: 'archive', url: `${row.original}#${row.timestamp.slice(0, 4)}`, archive_url: waybackView(row.timestamp, row.original),
-        title: `${row.original.replace(/^https?:\/\//, '')} as archived in ${row.timestamp.slice(0, 4)}`, outlet: 'Wayback Machine',
-        published_on: tsToDate(row.timestamp), year: Number(row.timestamp.slice(0, 4)), snippet: 'Old website snapshot. Check bio, policy pages, blog posts and media releases.', quotes: [],
-      });
-    }
+async function cdx(query, ms = 120000) {
+  let last;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await timed(`https://web.archive.org/cdx/search/cdx?${query}`, ms);
+      if (r.ok) return parseCdx(await r.json());
+      last = new Error(`Wayback Machine ${r.status}`);
+    } catch (e) { last = new Error(e.name === 'AbortError' ? 'Wayback Machine too slow to answer — try again later' : e.message); }
+    await new Promise(res => setTimeout(res, 3000));
   }
+  throw last;
+}
+
+const CONTENT_PATH = /(media|news|release|speech|transcript|statement|blog|article|opinion|column|op-?ed|interview|policy|policies|issues|newsletter|letter|post|story|stories|view|views|comment|20\d\d\/|19\d\d\/)/i;
+const SKIP_PATH = /\.(jpe?g|png|gif|css|js|ico|svg|woff2?|mp3|mp4|zip)(\?|$)|\/(tag|tags|category|author|feed|wp-json|wp-content|wp-includes|search|login|cart)\b|[?&](replytocom|share)=/i;
+
+// Old websites: one snapshot a year to browse, plus every archived article-like page read for quotes.
+async function archivedSites(person, beforeYear, summary) {
+  const urls = person.old_urls || [];
+  const out = [];
+  const to = beforeYear ? `&to=${beforeYear - 1}1231` : '';
+  const pages = [];
+  for (const raw of urls.slice(0, 5)) {
+    const u = raw.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const host = u.split('/')[0].replace(/^www\./, '');
+    try {
+      for (const row of (await cdx(`url=${encodeURIComponent(u)}&output=json&fl=timestamp,original&filter=statuscode:200&collapse=timestamp:4&limit=30${to}`)).slice(0, 4)) {
+        out.push({
+          kind: 'archive', url: `${row.original}#${row.timestamp.slice(0, 4)}`, archive_url: waybackView(row.timestamp, row.original),
+          title: `${row.original.replace(/^https?:\/\//, '')} as archived in ${row.timestamp.slice(0, 4)}`, outlet: 'Wayback Machine',
+          published_on: tsToDate(row.timestamp), year: Number(row.timestamp.slice(0, 4)), snippet: 'Old website home page. Browse it for bio, policy pages and links.', quotes: [],
+        });
+      }
+      const all = await cdx(`url=${encodeURIComponent(host)}&matchType=domain&output=json&fl=timestamp,original&filter=statuscode:200&filter=mimetype:text/html&collapse=urlkey&limit=5000${to}`);
+      const content = all.filter(r => CONTENT_PATH.test(r.original.replace(/^https?:\/\/[^/]+/, '')) && !SKIP_PATH.test(r.original));
+      pages.push(...content.map(r => ({ ...r, host })));
+      summary.site_pages_found = (summary.site_pages_found || 0) + content.length;
+    } catch (e) { summary.errors.push(`Old site ${host}: ${e.message}`); }
+  }
+  const pick = spread(pages, Number(process.env.SCAN_SITE_PAGES || 40));
+  const read = await pool(pick, 5, async (row) => {
+    const res = await timed(waybackRaw(row.timestamp, row.original), 45000);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const text = htmlToText(html);
+    if (text.length < 300) return null;
+    const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.replace(/\s+/g, ' ').trim() || row.original.replace(/^https?:\/\//, '');
+    const q = await extractQuotes(person, text, { title, ownSite: true }).catch(() => null);
+    const verified = (q?.quotes || []).filter(x => verifyQuote(x, text)).slice(0, 6);
+    if (!verified.length) return null;
+    const pub = q.published || '';
+    return {
+      kind: 'archive', url: row.original.replace(/:80\//, '/'), archive_url: waybackView(row.timestamp, row.original), title,
+      outlet: `${row.host} (archived)`, published_on: /^\d{4}-\d{2}-\d{2}$/.test(pub) ? pub : tsToDate(row.timestamp),
+      year: yearOf(pub) || Number(row.timestamp.slice(0, 4)), snippet: q.summary || 'Page from their old website.',
+      quotes: verified.map(text => ({ text, verified: true })),
+    };
+  });
+  out.push(...read.filter(Boolean));
   return out;
 }
 
@@ -272,6 +360,7 @@ export default async (req) => {
 
     const [person] = await db(`gf_people?id=eq.${scan.person_id}&select=*`);
     const beforeYear = scan.before_year || null;
+    SCAN_KEYWORDS = (scan.keywords || '').slice(0, 300);
     const summary = { web: 0, web_verified_quotes: 0, web_dropped: 0, tweets: 0, archives: 0, videos: 0, trove: 0, errors: [] };
     const leads = [];
     const tag = (l) => ({ ...l, person_id: person.id, scan_id: scanId });
@@ -281,22 +370,22 @@ export default async (req) => {
     if (!person.handles?.twitter) summary.notes = 'No Twitter handle in Research details, so archived tweets were skipped.';
     // Run the independent sources side by side
     const [webLeads, tweets, sites, vids, tro] = await Promise.all([
-      webSearch(person, beforeYear).catch(e => { summary.errors.push(`Web search: ${e.message}`); return []; }),
+      webSearch(person, beforeYear, summary, scan.keywords).catch(e => { summary.errors.push(`Web search: ${e.message}`); return []; }),
       person.handles?.twitter ? archivedTweets(person.handles.twitter, beforeYear).catch(e => { summary.errors.push(`Tweets: ${e.message}`); return []; }) : [],
-      (person.old_urls || []).length ? archivedSites(person.old_urls, beforeYear).catch(e => { summary.errors.push(`Old sites: ${e.message}`); return []; }) : [],
+      (person.old_urls || []).length ? archivedSites(person, beforeYear, summary).catch(e => { summary.errors.push(`Old sites: ${e.message}`); return []; }) : [],
       youtube(person, beforeYear).catch(e => { summary.errors.push(`YouTube: ${e.message}`); return []; }),
       trove(person, beforeYear).catch(e => { summary.errors.push(`Trove: ${e.message}`); return []; }),
     ]);
 
     // Read each web lead and keep only verified quotes
-    const checked = await pool(webLeads.slice(0, MAX_PAGES), 4, async (l) => {
+    const checked = await pool(webLeads.slice(0, MAX_PAGES), 6, async (l) => {
       const year = yearOf(l.date);
       const { text, archive_url } = await readPage(l.url, year || beforeYear);
       if (!text) return { kind: 'web', url: l.url, archive_url, title: l.title, outlet: l.outlet || null, published_on: /^\d{4}-\d{2}-\d{2}$/.test(l.date || '') ? l.date : null, year, snippet: `${l.why || ''} (Couldn't open the page to check quotes.)`.trim(), quotes: [] };
       const q = await extractQuotes(person, text, l);
       if (!q) return null;                    // page never mentions them
       if (q.same_person === false) return null;
-      const verified = (q.quotes || []).filter(s => verifyQuote(s, text)).slice(0, 5);
+      const verified = (q.quotes || []).filter(s => verifyQuote(s, text)).slice(0, 6);
       summary.web_dropped += (q.quotes || []).length - verified.length;
       summary.web_verified_quotes += verified.length;
       const pub = q.published || l.date || '';
@@ -316,6 +405,7 @@ export default async (req) => {
     const rows = [...new Map(leads.map(tag).map(l => [l.url, l])).values()];
     for (let i = 0; i < rows.length; i += 100) await upsert('gf_leads', rows.slice(i, i + 100), 'person_id,url', { ignore: true });
     summary.total = rows.length;
+    if (scan.keywords) summary.keywords = scan.keywords;
     await db(`gf_scans?id=eq.${scanId}`, { method: 'PATCH', body: { status: 'done', summary, finished_at: new Date().toISOString() } });
     await log('scan', summary.errors.filter(e => !/skipped/.test(e)).length === 0, { person: person.full_name, ...summary });
   } catch (e) {
