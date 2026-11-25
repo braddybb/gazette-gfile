@@ -639,25 +639,90 @@ async function tabVotes(p) {
   $('#vq').oninput = draw; draw();
 }
 
+/* ─────────── Money helpers ─────────── */
+const RECEIPT_HELP = {
+  'Other Receipt': 'Not declared as a donation, e.g. party levies or membership paid by an MP, fundraising income, transfers between branches.',
+  'Donation Received': 'Declared as a gift to the recipient.',
+  'Donation': 'Declared as a gift.',
+  'Election gift': 'Gift for an election campaign.',
+  'Public Funding': 'Electoral funding paid by the AEC after an election.',
+  'Subscription': 'Membership or subscription fees.',
+};
+const donYear = (d) => d.received_on ? Number(d.received_on.slice(0, 4)) : (String(d.period || '').match(/(19|20)\d\d/) || [])[0] ? Number(String(d.period).match(/(19|20)\d\d/)[0]) : null;
+const typeCell = (d) => { const t = d.receipt_type || d.return_type || ''; const h = RECEIPT_HELP[t]; return h ? `<span title="${esc(h)}" style="border-bottom:1px dotted var(--muted);cursor:help">${esc(t)}</span>` : esc(t); };
+function groupBy(rows, keyFn) {
+  const m = new Map();
+  for (const r of rows) { const k = keyFn(r) || '—'; const g = m.get(k) || { key: k, n: 0, total: 0, first: null, last: null }; g.n++; g.total += Number(r.amount || 0); const y = donYear(r); if (y) { g.first = g.first ? Math.min(g.first, y) : y; g.last = g.last ? Math.max(g.last, y) : y; } m.set(k, g); }
+  return [...m.values()].sort((a, b) => b.total - a.total);
+}
+function moneySection(title, rows, otherSide, opts = {}) {
+  if (!rows.length) return `<div class="card stack"><h3 style="margin:0">${esc(title)}</h3><div class="meta">${esc(opts.empty || 'Nothing found.')}</div></div>`;
+  const total = rows.reduce((a, d) => a + Number(d.amount || 0), 0);
+  const years = rows.map(donYear).filter(Boolean);
+  const top = groupBy(rows, d => d[otherSide]).slice(0, 8);
+  const byYear = groupBy(rows, d => donYear(d)).sort((a, b) => Number(b.key) - Number(a.key)).filter(g => g.key !== '—').slice(0, 20);
+  const sorted = [...rows].sort((a, b) => (donYear(b) || 0) - (donYear(a) || 0) || Number(b.amount || 0) - Number(a.amount || 0));
+  const id = 'ms' + Math.random().toString(36).slice(2, 8);
+  return `<div class="card stack">
+    <div class="row" style="align-items:baseline"><div><h3 style="margin:0">${esc(title)}</h3></div><div class="shrink"><span class="k" style="font-size:1.3rem">${money(total)}</span> <span class="meta">across ${rows.length} record${rows.length === 1 ? '' : 's'}${years.length ? `, ${Math.min(...years)}–${Math.max(...years)}` : ''}</span></div></div>
+    ${opts.note ? `<div class="hint">${opts.note}</div>` : ''}
+    <div class="row" style="align-items:flex-start;gap:1.2rem">
+      <div style="flex:3;min-width:280px"><div class="meta k" style="margin-bottom:.3rem">${otherSide === 'donor_name' ? 'Biggest givers' : 'Biggest recipients'}</div>
+        <table><tbody>${top.map(g => `<tr><td>${esc(g.key)}</td><td class="meta">${g.n}×${g.first ? `, ${g.first === g.last ? g.first : `${g.first}–${g.last}`}` : ''}</td><td class="num k">${money(g.total)}</td></tr>`).join('')}</tbody></table></div>
+      ${byYear.length > 1 ? `<div style="flex:1;min-width:180px"><div class="meta k" style="margin-bottom:.3rem">By year</div><table><tbody>${byYear.map(g => `<tr><td>${esc(g.key)}</td><td class="num">${money(g.total)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    </div>
+    <details><summary class="linkish" style="cursor:pointer">Every record (${rows.length})</summary>
+      <table style="margin-top:.5rem"><thead><tr><th>${otherSide === 'donor_name' ? 'From' : 'To'}</th><th>When</th><th>Type</th><th>Reported in</th><th class="num">Amount</th></tr></thead><tbody>
+      ${sorted.map(d => `<tr><td>${esc(d[otherSide])}${otherSide === 'donor_name' ? '' : ''}<div class="meta">${esc(otherSide === 'donor_name' ? d.recipient_name : d.donor_name)}</div></td><td>${d.received_on ? fmtDate(d.received_on) : esc(d.period || '')}${d.received_on && d.period ? `<div class="meta">${esc(d.period)}</div>` : ''}</td><td>${typeCell(d)}</td><td class="meta">${esc(DON_SRC[d.source] || d.source || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}
+      </tbody></table></details>
+  </div>`;
+}
+// Name patterns for a person: "Anne Aly", "Dr Anne Aly MP", "ALY, Anne", "ALP Branch - Anne Aly"
+function personNameTests(p) {
+  const firsts = [...new Set([(p.first_name || p.full_name.split(' ')[0] || '').split(' ')[0], ...(p.aliases || []).map(a => a.split(' ')[0])].filter(x => x && x.length > 1))];
+  const lasts = [...new Set([p.last_name || p.full_name.split(' ').pop(), ...(p.aliases || []).map(a => a.split(' ').pop())].filter(Boolean))];
+  const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regexes = [];
+  for (const f of firsts) for (const l of lasts) {
+    regexes.push(new RegExp(`\\b${reEsc(f)}\\b[\\w .'-]{0,25}\\b${reEsc(l)}\\b`, 'i'));
+    regexes.push(new RegExp(`\\b${reEsc(l)}\\s*,\\s*${reEsc(f)}\\b`, 'i'));
+  }
+  const ilikes = [];
+  for (const f of firsts) for (const l of lasts) { ilikes.push(`%${f}%${l}%`); ilikes.push(`%${l},%${f}%`); }
+  return { test: (s) => regexes.some(r => r.test(s || '')), ilikes: ilikes.map(x => x.replace(/[,()"]/g, m => m === ',' ? ',' : '')) };
+}
+async function donationsMatching(column, patterns, limit = 1000) {
+  const out = new Map();
+  for (const pat of patterns.slice(0, 8)) {
+    const { data } = await sb.from('gf_donations').select('*').ilike(column, pat).limit(limit);
+    for (const d of data || []) out.set(d.id, d);
+  }
+  return [...out.values()];
+}
+
 async function tabMoney(p) {
-  const el = $('#ptab'); el.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
-  const [{ data: linked }, { data: fuzzy }] = await Promise.all([
-    sb.from('gf_donations').select('*').eq('person_id', p.id).order('amount', { ascending:false }).limit(300),
-    p.last_name ? sb.from('gf_donations').select('*').is('person_id', null).ilike('recipient_name', `%${p.last_name}%`).order('amount', { ascending:false }).limit(100) : Promise.resolve({ data: [] }),
+  const el = $('#ptab'); el.innerHTML = '<div class="empty"><span class="spinner"></span> Searching donation records…</div>';
+  const names = personNameTests(p);
+  const [toRaw, fromRaw, linked] = await Promise.all([
+    donationsMatching('recipient_name', names.ilikes),
+    donationsMatching('donor_name', names.ilikes),
+    (async () => (await sb.from('gf_donations').select('*').eq('person_id', p.id).limit(1000)).data || [])(),
   ]);
-  const fz = (fuzzy || []).filter(d => !p.first_name || d.recipient_name.toLowerCase().includes(p.first_name.split(' ')[0].toLowerCase()));
-  const total2 = (linked || []).filter(d => !/donor/.test(d.source || '')).reduce((a, d) => a + Number(d.amount || 0), 0);
-  const tbl = (rows, linkable) => `<table><thead><tr><th>Donor</th><th>Recipient</th><th>When</th><th>Reported in</th><th class="num">Amount</th>${linkable ? '<th></th>' : ''}</tr></thead><tbody>
-    ${rows.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${esc(d.recipient_name)}</td><td>${d.received_on ? fmtDate(d.received_on) : esc(d.period || '')}</td><td class="meta">${esc(DON_SRC[d.source] || d.source || '')}</td><td class="num">${money(d.amount)}</td>${linkable ? `<td><button class="linkish" data-link="${d.id}">This is them</button></td>` : ''}</tr>`).join('')}</tbody></table>`;
-  const total = (linked || []).reduce((a, d) => a + Number(d.amount || 0), 0);
+  const to = new Map(linked.map(d => [d.id, d]));
+  for (const d of toRaw) if (names.test(d.recipient_name)) to.set(d.id, d);
+  const from = fromRaw.filter(d => names.test(d.donor_name));
+  const isFederal = p.jurisdiction === 'federal';
   el.innerHTML = `
-    <div class="card stack"><h3>Linked to ${esc(p.full_name)} ${linked?.length ? `<span class="meta">· ${money(total)} across ${linked.length} records</span>` : ''}</h3>
-      ${linked?.length ? tbl(linked) : '<div class="meta">Nothing linked yet. Import AEC data in Money, then link matches below.</div>'}</div>
-    ${fz.length ? `<div class="card stack" style="margin-top:.8rem"><h3>Possible matches by name</h3><div class="hint">Recipient names that look like this person. Confirm before linking.</div>${tbl(fz, true)}</div>` : ''}`;
-  $$('[data-link]', el).forEach(b => b.onclick = async () => {
-    const { error } = await sb.rpc('gf_link_donation', { p_donation: b.dataset.link, p_person: p.id });
-    error ? toast(error.message, true) : (toast('Linked'), tabMoney(p));
-  });
+    <div class="banner warn" style="margin-bottom:.8rem">${isFederal
+      ? 'Federal MPs rarely receive donations in their own name. Most money goes to their party, and AEC returns record it that way. Below is everything that names them personally, as recipient (including campaign accounts) or as payer. "Other receipt" payments from MPs to their party are usually levies.'
+      : 'Shows every imported record that names them, from AEC and state commission imports. State MPs only appear once you import their state commission data (Money → Import a state electoral commission CSV).'}
+      ${p.party ? ` <button class="linkish" id="partymoney">See money to ${esc(p.party)} →</button>` : ''}</div>
+    <div class="stack">
+      ${moneySection(`Money to ${p.full_name} or their campaigns`, [...to.values()], 'donor_name', { empty: 'No donation records name them as the recipient.' })}
+      ${moneySection(`Money from ${p.full_name}`, from, 'recipient_name', { empty: 'No records name them as a donor or payer.' })}
+    </div>
+    <div class="hint" style="margin-top:.6rem">Matched by name, so check unusual results against the original return. The same payment can appear twice, once in the giver's return and once in the receiver's.</div>`;
+  if ($('#partymoney')) $('#partymoney').onclick = () => { window.__moneyQuery = p.party; location.hash = '#money'; };
 }
 
 async function tabInterests(p) {
@@ -939,14 +1004,27 @@ function viewMoney() {
   </div>`;
   $('#mf').onsubmit = async (e) => {
     e.preventDefault();
-    const q = $('#mq').value.trim().replace(/[%_,()]/g, ' '); if (!q) return;
+    const q = $('#mq').value.trim().replace(/[%_,()"]/g, ' ').replace(/\s+/g, ' ').trim(); if (!q) return;
     $('#mres').innerHTML = '<span class="spinner"></span>';
-    const { data, error } = await sb.from('gf_donations').select('*').or(`donor_name.ilike.%${q}%,recipient_name.ilike.%${q}%`).order('amount', { ascending:false }).limit(200);
-    if (error) return ($('#mres').innerHTML = `<div class="banner err">${esc(error.message)}</div>`);
-    const total = data.reduce((a, d) => a + Number(d.amount || 0), 0);
-    $('#mres').innerHTML = data.length ? `<div class="meta">${data.length}${data.length === 200 ? '+' : ''} records · ${money(total)}</div><table><thead><tr><th>Donor</th><th>Recipient</th><th>When</th><th>Type</th><th>Reported in</th><th class="num">Amount</th></tr></thead><tbody>
-      ${data.map(d => `<tr><td>${esc(d.donor_name)}</td><td>${d.person_id ? `<a href="#person/${d.person_id}">${esc(d.recipient_name)}</a>` : esc(d.recipient_name)}</td><td>${d.received_on ? fmtDate(d.received_on) : esc(d.period || '')}${d.received_on && d.period ? `<div class="meta">${esc(d.period)}</div>` : ''}</td><td>${esc(d.receipt_type || d.return_type || '')}</td><td class="meta">${esc(DON_SRC[d.source] || d.source || '')}</td><td class="num">${money(d.amount)}</td></tr>`).join('')}</tbody></table><div class="hint">The same gift can appear twice: once in the giver's return and once in the receiver's. Check "Reported in" before adding up totals.</div>` : '<div class="meta">No matches.</div>';
+    const pat = `%${q.split(' ').join('%')}%`;
+    const [rec, giv] = await Promise.all([
+      sb.from('gf_donations').select('*').ilike('recipient_name', pat).order('amount', { ascending:false }).limit(2000),
+      sb.from('gf_donations').select('*').ilike('donor_name', pat).order('amount', { ascending:false }).limit(2000),
+    ]);
+    if (rec.error || giv.error) return ($('#mres').innerHTML = `<div class="banner err">${esc((rec.error || giv.error).message)}</div>`);
+    const recNames = groupBy(rec.data, d => d.recipient_name).slice(0, 6).map(g => g.key);
+    const givNames = groupBy(giv.data, d => d.donor_name).slice(0, 6).map(g => g.key);
+    $('#mres').innerHTML = (!rec.data.length && !giv.data.length) ? '<div class="meta">No matches.</div>' : `
+      <div class="hint" style="margin:.4rem 0 .8rem">Names matching "${esc(q)}". Click one to narrow to it: ${[...new Set([...recNames, ...givNames])].slice(0, 10).map(n => `<button class="linkish" data-narrow="${esc(n)}">${esc(n)}</button>`).join(' · ')}${rec.data.length === 2000 || giv.data.length === 2000 ? ' · <b>showing the first 2,000 of each; narrow your search</b>' : ''}</div>
+      <div class="stack">
+        ${moneySection(`Money received by "${q}"`, rec.data, 'donor_name', { empty: 'Nothing received by a matching name.' })}
+        ${moneySection(`Money given by "${q}"`, giv.data, 'recipient_name', { empty: 'Nothing given by a matching name.' })}
+      </div>
+      <div class="hint" style="margin-top:.5rem">The same gift can appear twice: once in the giver's return and once in the receiver's. Check "Reported in" before adding up totals. Hover a type for what it means.</div>`;
+    $$('[data-narrow]', $('#mres')).forEach(b => b.onclick = () => { $('#mq').value = b.dataset.narrow; $('#mf').requestSubmit(); });
   };
+  if (window.__moneyQuery) { $('#mq').value = window.__moneyQuery; window.__moneyQuery = null; $('#mf').requestSubmit(); }
+
   $('#mzip').onchange = (e) => importAecZip(e.target.files[0]);
   $('#mfile').onchange = async (e) => {
     const file = e.target.files[0]; if (!file) return;
