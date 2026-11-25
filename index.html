@@ -271,6 +271,7 @@ function researchLine(p) {
   if ((p.aliases || []).length) bits.push(`Also known as: ${p.aliases.map(esc).join(', ')}`);
   if (p.handles?.twitter) bits.push(`Twitter/X: @${esc(String(p.handles.twitter).replace(/^@/, ''))}`);
   if ((p.old_urls || []).length) bits.push(`Old sites: ${p.old_urls.map(esc).join(', ')}`);
+  if (p.first_elected) bits.push(`First elected ${p.first_elected}`);
   return bits.length ? `<div class="meta" style="margin-top:.3rem">${bits.join(' · ')}</div>` : '';
 }
 function researchDialog(p) {
@@ -281,6 +282,7 @@ function researchDialog(p) {
     <label>Other names <span class="hint">(maiden name, nickname, how they were known at uni — comma separated)</span></label><input name="aliases" value="${esc((p.aliases || []).join(', '))}">
     <label>Twitter/X handle <span class="hint">(archived tweets get pulled from the Wayback Machine)</span></label><input name="twitter" value="${esc(p.handles?.twitter || '')}" placeholder="@handle">
     <label>Old websites <span class="hint">(personal, campaign, business, blog — one per line)</span></label><textarea name="old_urls" style="min-height:70px">${esc((p.old_urls || []).join('\n'))}</textarea>
+    <label>First elected <span class="hint">(year — the old-media scan looks before this by default)</span></label><input name="first_elected" type="number" min="1900" max="2100" value="${esc(p.first_elected || '')}">
     <label>Background notes <span class="hint">(previous jobs, hometown, uni, unions, businesses — used to search)</span></label><textarea name="notes">${esc(p.notes || '')}</textarea>
     <div class="row" style="margin-top:1rem"><div class="shrink"><button class="btn" value="save">Save</button></div><div class="shrink"><button class="btn ghost" value="cancel" formnovalidate>Cancel</button></div></div>
   </form>`;
@@ -298,6 +300,7 @@ function researchDialog(p) {
         p_old_urls: fd.old_urls.split(/\n+/).map(x => x.trim()).filter(Boolean),
         p_notes: fd.notes.trim() || null,
       });
+      if (!error) { const y = Number(fd.first_elected) || null; if (y !== (p.first_elected || null)) { const r2 = await sb.rpc('gf_set_first_elected', { p_person: p.id, p_year: y }); if (r2.error) return toast(r2.error.message, true); } }
       error ? toast(error.message, true) : (toast('Saved'), viewPerson(p.id));
     }
     d.remove();
@@ -317,7 +320,7 @@ async function tabOldMedia(p) {
       ${researchLine(p) || `<div class="banner warn">Add their old Twitter handle, websites and other names under <b>Research details</b> first. It makes a big difference.</div>`}
       <form id="sf2" class="row">
         <div style="flex:2"><label for="kw">Focus on topics <span class="hint">(optional, comma separated)</span></label><input id="kw" placeholder="e.g. nuclear, live exports, coal seam gas"></div>
-        <div><label for="by">Published before</label><input id="by" type="number" min="1950" max="${yr + 1}" value="2013"></div>
+        <div><label for="by">Published before</label><input id="by" type="number" min="1950" max="${yr + 1}" value="${p.first_elected ? p.first_elected : yr + 1}"><div class="hint">${p.first_elected ? `First elected ${p.first_elected}, so this looks at everything before office.` : 'First-elected year unknown. Set it under Research details.'}</div></div>
         <div class="shrink" style="padding-bottom:.55rem"><label style="display:flex;gap:.4rem;align-items:center;font-weight:400"><input type="checkbox" id="anytime" style="width:auto"> Any date</label></div>
         <div class="shrink"><button class="btn red" type="submit">Run deep scan</button></div>
       </form>
@@ -380,7 +383,7 @@ async function tabOldMedia(p) {
       if (!s) return;
       if (s.status === 'done') {
         const m = s.summary || {};
-        $('#scanstat').innerHTML = `<div class="banner ok">Done${m.keywords ? ` (focus: ${esc(m.keywords)})` : ''}: ${m.total || 0} leads. ${m.web || 0} web pages (${m.web_verified_quotes || 0} quotes verified${m.web_dropped ? `, ${m.web_dropped} unverifiable quotes thrown out` : ''}), ${m.tweets || 0} archived tweets, ${m.archives || 0} old-website pages and snapshots${m.site_pages_found ? ` (from ${m.site_pages_found} archived pages found)` : ''}, ${m.videos || 0} videos, ${m.trove || 0} Trove articles.${(m.errors || []).length ? `<br><span class="meta">Problems: ${esc(m.errors.join('; '))}</span>` : ''}</div>`;
+        $('#scanstat').innerHTML = `<div class="banner ok">Done${m.keywords ? ` (focus: ${esc(m.keywords)})` : ''}: ${m.total || 0} leads. ${m.web || 0} web pages (${m.web_verified_quotes || 0} quotes verified${m.web_dropped ? `, ${m.web_dropped} unverifiable quotes thrown out` : ''}), ${m.tweets || 0} archived tweets, ${m.archives || 0} old-website pages and snapshots${m.site_pages_found ? ` (from ${m.site_pages_found} archived pages found)` : ''}, ${m.videos || 0} videos, ${m.trove || 0} Trove articles.${m.too_recent || m.wrong_person ? `<br><span class="meta">Filtered out: ${m.too_recent || 0} pages from after the cut-off, ${m.wrong_person || 0} about someone else.</span>` : ''}${(m.blocked_sites || []).length ? `<br><span class="meta"><b>These sites block AI search, so search them yourself (or through a library news database):</b> ${esc(m.blocked_sites.join(', '))}</span>` : ''}${(m.errors || []).length ? `<br><span class="meta">Problems: ${esc(m.errors.join('; '))}</span>` : ''}</div>`;
         $('#lst').value = 'new'; return drawLeads();
       }
       if (s.status === 'error') { $('#scanstat').innerHTML = `<div class="banner err">${esc(s.error || 'Scan failed')}</div>`; return; }
