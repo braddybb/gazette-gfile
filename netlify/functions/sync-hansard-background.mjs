@@ -1,7 +1,7 @@
 // Pulls recent federal Hansard speeches for a rotating batch of members and files
 // them as statements. First pass on a person goes deeper (up to 300 speeches);
 // later passes just top up. Then posts any new matches for watched topics to Slack.
-import { db, upsert, log, requireUser, isCron, oa, hansardRowToStatement, slack } from '../lib/gfile.mjs';
+import { db, upsert, log, requireUser, isCron, oaSpeeches, hansardRowToStatement, slack } from '../lib/gfile.mjs';
 
 const BATCH = Number(process.env.HANSARD_BATCH || 60);
 
@@ -24,7 +24,7 @@ export default async (req) => {
         const num = firstPass ? 100 : 50;
         const rows = [];
         for (let page = 1; page <= pages; page++) {
-          const data = await oa('getHansard', { person: p.oa_person_id, order: 'd', num: String(num), page: String(page) });
+          const data = await oaSpeeches(p.oa_person_id, { num, page });
           const got = Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
           rows.push(...got);
           if (got.length < num) break;
